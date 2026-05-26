@@ -1,0 +1,2544 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinGram - Ultimate Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        
+        canvas {
+                    image-rendering: pixelated; 
+                    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+                    border-radius: 8px;
+                    border: 4px solid #334155;
+                    background-color: #4ade80; 
+                    max-width: 100%;  
+                    height: auto;
+                    /* PŘIDÁNO PRO FULLSCREEN: */
+                    max-height: 100vh;
+                    object-fit: contain;
+                }
+        
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        
+        .bank-table th { position: sticky; top: 0; background: #f8fafc; z-index: 10; }
+        .pixel-font { font-family: 'Courier New', Courier, monospace; font-weight: 900; letter-spacing: 1px; }
+    
+    /* --- STYLY PRO LEGENDU OVLÁDÁNÍ --- */
+    .sprite-key {
+        background-image: url('klavesnice.png');
+        background-repeat: no-repeat;
+        background-position: var(--bg-x) var(--bg-y);
+        display: block;
+        image-rendering: pixelated;
+
+        transform: scale(2);
+        transform-origin: top left;
+
+        transition:
+            background-position 0.005s ease-out,
+            transform 0.005s ease-out;
+    }
+
+    .sprite-key.pressed {
+        background-position: calc(var(--bg-x) - 224px) var(--bg-y);
+        transform: translateY(2px) scale(2);
+    }
+    .key-std {
+        width: 16px;
+        height: 16px;
+    }
+    .key-shift {
+        width: 40px;
+        height: 16px;
+    }
+    .key-space {
+        width: 100px;
+        height: 16px;
+    }
+    /* --- FULLSCREEN STYLY FINÁLNÍ OPRAVA --- */
+            /* Skryje levé menu, legendu a nadpis */
+            body.fullscreen-mode nav { display: none !important; }
+            body.fullscreen-mode #controls-legend { display: none !important; }
+            body.fullscreen-mode #tab-game > div:first-child { display: none !important; } 
+            
+            /* Pravý panel zůstane, jen se trochu zúží */
+            body.fullscreen-mode aside { width: 16rem !important; min-width: 16rem !important; }
+
+            /* TADY BYL PROBLÉM: Uvolnění maximální šířky nadřazeného kontejneru */
+            body.fullscreen-mode main > div.max-w-7xl {
+                max-width: 100% !important; /* Zbourání zdi 1280px */
+                padding: 0 !important;
+                margin: 0 !important;
+                display: flex !important;
+                flex-direction: column !important;
+            }
+
+            body.fullscreen-mode main { 
+                background: #0a0a0a !important; 
+                padding: 0 !important; 
+            }
+
+            body.fullscreen-mode #tab-game {
+                display: flex;
+                flex: 1;
+                flex-direction: column;
+                height: 100vh;
+                background: #0a0a0a;
+            }
+
+            /* Obal mapy - čistý flexbox pro perfektní vycentrování s černými okraji */
+            body.fullscreen-mode #canvas-wrapper {
+                flex: 1;
+                width: 100% !important;
+                max-width: none !important;
+                height: 100% !important;
+                border: none !important;
+                border-radius: 0 !important;
+                padding: 3vh 3vw !important; /* Dýchací prostor (rámeček) kolem mapy */
+                background: transparent !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+            }
+
+            /* Matematicky dokonalé škálování plátna */
+            body.fullscreen-mode canvas {
+                width: 100% !important;
+                height: auto !important;
+                max-width: 100% !important;
+                max-height: 94vh !important; /* Nepřeteče na výšku */
+                aspect-ratio: 16 / 9 !important; /* Striktní dodržení formátu bez zelených pruhů */
+                object-fit: fill !important; 
+                background-color: #4ade80 !important;
+                border: 4px solid #1e293b !important;
+                border-radius: 12px !important;
+                box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7) !important;
+            }
+
+    /* Zvednutí Mezerníku nad plátno POUZE ve fullscreenu */
+            body.fullscreen-mode #tab-game {
+                position: relative; 
+            }
+            body.fullscreen-mode #interaction-container {
+                position: absolute !important;
+                bottom: 6vh !important;
+                left: 50% !important;
+                transform: translateX(-50%) !important;
+                margin: 0 !important;
+                width: auto !important;
+                z-index: 100 !important;
+            }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 h-screen flex overflow-hidden">
+
+    <nav class="w-64 bg-slate-900 text-white flex flex-col shadow-2xl z-20 shrink-0">
+        <div class="p-6 border-b border-slate-800">
+            <h1 class="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400 tracking-tighter">FinGram</h1>
+            <p class="text-[10px] text-slate-400 mt-1 uppercase tracking-widest font-bold">Verze 4.0 - Grafika & Fixy</p>
+        </div>
+        
+        <div class="flex-1 py-4 overflow-y-auto space-y-1">
+            <button onclick="switchTab('dashboard')" class="nav-btn w-full text-left px-6 py-4 text-slate-300 hover:bg-slate-800 transition flex items-center gap-3 border-l-4 border-transparent">
+                <i class="fas fa-file-invoice-dollar w-5 text-center"></i> Bankovní výpis
+            </button>
+            <button onclick="switchTab('game')" class="nav-btn w-full text-left px-6 py-4 text-emerald-400 bg-slate-800 border-l-4 border-emerald-400 font-bold transition flex items-center gap-3">
+                <i class="fas fa-city w-5 text-center"></i> Město (Hra)
+            </button>
+            <button onclick="switchTab('cv')" class="nav-btn w-full text-left px-6 py-4 text-slate-300 hover:bg-slate-800 transition flex items-center gap-3 border-l-4 border-transparent">
+                <i class="fas fa-briefcase w-5 text-center"></i> Moje Kariéra
+            </button>
+            <button onclick="switchTab('obsah')" class="nav-btn w-full text-left px-6 py-4 text-slate-300 hover:bg-slate-800 transition flex items-center gap-3 border-l-4 border-transparent">
+                <i class="fas fa-book-open w-5 text-center"></i> Obsah
+            </button>
+        </div>
+    </nav>
+
+    <main class="flex-1 overflow-y-auto bg-slate-50 relative flex flex-col">
+        
+        <div id="game-modal" class="fixed inset-0 bg-slate-900/90 z-50 hidden flex items-center justify-center backdrop-blur-sm p-4">
+            <div class="bg-white rounded-3xl p-8 max-w-2xl w-full shadow-2xl border-2 border-slate-200 max-h-[90vh] overflow-y-auto relative" id="game-modal-content"></div>
+        </div>
+
+        <div class="flex-1 p-8 w-full max-w-7xl mx-auto">
+            
+            <div id="tab-dashboard" class="tab-content hidden h-full flex flex-col">
+                <div class="flex justify-between items-end mb-8">
+                    <div>
+                        <h2 class="text-4xl font-black text-slate-800 tracking-tight">Běžný účet</h2>
+                        <p class="text-slate-500 font-medium">CZ85 0100 0000 0012 3456 7890</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">Disponibilní zůstatek</p>
+                        <p class="text-5xl font-black text-slate-900" id="dash-balance">5 000 CZK</p>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 flex-1 overflow-hidden flex flex-col">
+                    <div class="p-6 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                        <h3 class="font-bold text-slate-700">Historie transakcí</h3>
+                    </div>
+                    <div class="overflow-y-auto flex-1">
+                        <table class="w-full text-left border-collapse bank-table">
+                            <thead>
+                                <tr class="text-xs text-slate-400 uppercase tracking-wider border-b border-slate-200">
+                                    <th class="p-4 font-bold">Datum</th>
+                                    <th class="p-4 font-bold">Popis transakce</th>
+                                    <th class="p-4 font-bold text-right">Částka</th>
+                                    <th class="p-4 font-bold text-right">Zůstatek</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tx-table-body" class="divide-y divide-slate-100 text-sm"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-game" class="tab-content block">
+                            <div class="flex justify-between items-center mb-4">
+                                <div>
+                                    <h2 class="text-3xl font-black text-slate-800">FinTown</h2>
+                                </div>
+                                <div id="event-banner" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded shadow-sm max-w-md animate-pulse">
+                                    <p class="font-bold"><i class="fas fa-exclamation-triangle"></i> Mimořádná zpráva</p>
+                                    <p class="text-sm" id="event-text">Inflace roste!</p>
+                                </div>
+                            </div>
+                            
+                            <div id="canvas-wrapper" class="relative flex justify-center items-center bg-slate-800 p-2 rounded-xl shadow-xl w-full max-w-[1200px] mx-auto border-4 border-slate-900 group overflow-hidden transition-all duration-300">
+                                <canvas id="gameCanvas" width="960" height="540" class="w-full h-auto object-contain"></canvas>
+                                
+                                <button onclick="toggleFullscreen()" id="fullscreen-btn" title="Celá obrazovka" class="absolute top-4 right-4 bg-slate-900/80 hover:bg-black text-white w-10 h-10 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all z-50 shadow-lg cursor-pointer">
+                                    <i class="fas fa-expand text-xl pointer-events-none"></i>
+                                </button>
+                            </div>
+
+                            <div id="interaction-container" class="flex justify-center mt-6 h-16 w-full pointer-events-none">
+                                <div id="interaction-overlay" style="display: none;" class="bg-blue-600 text-white px-6 py-2 rounded-xl font-black text-lg shadow-2xl border-4 border-blue-400 animate-bounce pointer-events-none z-50">
+                                    <i class="fas fa-keyboard mr-2"></i> Stiskni MEZERNÍK
+                                </div>
+                            </div>
+                        </div>
+
+            <div id="tab-shop" class="tab-content hidden">
+                <div class="flex justify-between items-end mb-6">
+                    <div>
+                        <h2 class="text-4xl font-black text-slate-800 tracking-tight">Tržnice</h2>
+                    </div>
+                    <div class="bg-red-50 px-4 py-2 rounded-xl border border-red-100">
+                        <p class="text-xs font-bold text-red-800 uppercase tracking-wider">Aktuální Inflace</p>
+                        <p class="text-2xl font-black text-red-600" id="shop-inflation">0 %</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="shop-container"></div>
+            </div>
+
+            <div id="tab-obsah" class="tab-content hidden">
+                <div class="mb-8">
+                    <h2 class="text-4xl font-black text-slate-800 tracking-tight mb-2">Obsah kurzu</h2>
+                    <p class="text-slate-500 font-medium">Finanční gramotnost od základů – 40 kapitol pro tvůj finanční úspěch</p>
+                </div>
+
+                <!-- Sekce 1: Základy peněz -->
+                <div class="mb-10">
+                    <div class="flex items-center gap-3 mb-5">
+                        <div class="w-1 h-8 bg-blue-500 rounded-full"></div>
+                        <h3 class="text-lg font-black text-slate-700 uppercase tracking-wider">Základy peněz</h3>
+                        <div class="flex-1 h-px bg-slate-200"></div>
+                        <span class="text-xs font-bold text-blue-500 bg-blue-50 px-3 py-1 rounded-full">Kapitoly 1–10</span>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-blue-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center mb-3 group-hover:bg-blue-500 transition-colors">
+                                <i class="fas fa-coins text-blue-500 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-blue-400 uppercase tracking-wider">Kapitola 1</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Co jsou peníze?</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-blue-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center mb-3 group-hover:bg-blue-500 transition-colors">
+                                <i class="fas fa-university text-blue-500 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-blue-400 uppercase tracking-wider">Kapitola 2</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Bankovní účty</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-blue-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center mb-3 group-hover:bg-blue-500 transition-colors">
+                                <i class="fas fa-credit-card text-blue-500 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-blue-400 uppercase tracking-wider">Kapitola 3</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Debetní karta</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-blue-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center mb-3 group-hover:bg-blue-500 transition-colors">
+                                <i class="fas fa-hand-holding-usd text-blue-500 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-blue-400 uppercase tracking-wider">Kapitola 4</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Kreditní karta</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-blue-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center mb-3 group-hover:bg-blue-500 transition-colors">
+                                <i class="fas fa-fire text-blue-500 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-blue-400 uppercase tracking-wider">Kapitola 5</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Inflace</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-blue-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center mb-3 group-hover:bg-blue-500 transition-colors">
+                                <i class="fas fa-percentage text-blue-500 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-blue-400 uppercase tracking-wider">Kapitola 6</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Úroky</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-blue-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center mb-3 group-hover:bg-blue-500 transition-colors">
+                                <i class="fas fa-snowball text-blue-500 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-blue-400 uppercase tracking-wider">Kapitola 7</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Složené úročení</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-blue-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center mb-3 group-hover:bg-blue-500 transition-colors">
+                                <i class="fas fa-wallet text-blue-500 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-blue-400 uppercase tracking-wider">Kapitola 8</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Hrubá vs. čistá mzda</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-blue-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center mb-3 group-hover:bg-blue-500 transition-colors">
+                                <i class="fas fa-receipt text-blue-500 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-blue-400 uppercase tracking-wider">Kapitola 9</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Daně základy</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-blue-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center mb-3 group-hover:bg-blue-500 transition-colors">
+                                <i class="fas fa-tag text-blue-500 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-blue-400 uppercase tracking-wider">Kapitola 10</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">DPH a ceny</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sekce 2: Spoření a investice -->
+                <div class="mb-10">
+                    <div class="flex items-center gap-3 mb-5">
+                        <div class="w-1 h-8 bg-emerald-500 rounded-full"></div>
+                        <h3 class="text-lg font-black text-slate-700 uppercase tracking-wider">Spoření a investice</h3>
+                        <div class="flex-1 h-px bg-slate-200"></div>
+                        <span class="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">Kapitoly 11–20</span>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-emerald-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center mb-3 group-hover:bg-emerald-500 transition-colors">
+                                <i class="fas fa-piggy-bank text-emerald-600 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-emerald-500 uppercase tracking-wider">Kapitola 11</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Spoření</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-emerald-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center mb-3 group-hover:bg-emerald-500 transition-colors">
+                                <i class="fas fa-chart-line text-emerald-600 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-emerald-500 uppercase tracking-wider">Kapitola 12</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Akcie</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-emerald-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center mb-3 group-hover:bg-emerald-500 transition-colors">
+                                <i class="fas fa-landmark text-emerald-600 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-emerald-500 uppercase tracking-wider">Kapitola 13</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Státní dluhopisy</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-emerald-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center mb-3 group-hover:bg-emerald-500 transition-colors">
+                                <i class="fas fa-layer-group text-emerald-600 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-emerald-500 uppercase tracking-wider">Kapitola 14</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Podílové fondy</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-emerald-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center mb-3 group-hover:bg-emerald-500 transition-colors">
+                                <i class="fas fa-exchange-alt text-emerald-600 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-emerald-500 uppercase tracking-wider">Kapitola 15</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">ETF indexy</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-emerald-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center mb-3 group-hover:bg-emerald-500 transition-colors">
+                                <i class="fas fa-home text-emerald-600 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-emerald-500 uppercase tracking-wider">Kapitola 16</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Nemovitosti</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-emerald-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center mb-3 group-hover:bg-emerald-500 transition-colors">
+                                <i class="fas fa-bitcoin text-emerald-600 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-emerald-500 uppercase tracking-wider">Kapitola 17</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Kryptoměny</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-emerald-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center mb-3 group-hover:bg-emerald-500 transition-colors">
+                                <i class="fas fa-chart-pie text-emerald-600 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-emerald-500 uppercase tracking-wider">Kapitola 18</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Diverzifikace</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-emerald-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center mb-3 group-hover:bg-emerald-500 transition-colors">
+                                <i class="fas fa-exclamation-triangle text-emerald-600 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-emerald-500 uppercase tracking-wider">Kapitola 19</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Riziko investic</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-emerald-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center mb-3 group-hover:bg-emerald-500 transition-colors">
+                                <i class="fas fa-infinity text-emerald-600 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-emerald-500 uppercase tracking-wider">Kapitola 20</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Pasivní příjem</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sekce 3: Dluhy a úvěry -->
+                <div class="mb-10">
+                    <div class="flex items-center gap-3 mb-5">
+                        <div class="w-1 h-8 bg-orange-500 rounded-full"></div>
+                        <h3 class="text-lg font-black text-slate-700 uppercase tracking-wider">Dluhy a úvěry</h3>
+                        <div class="flex-1 h-px bg-slate-200"></div>
+                        <span class="text-xs font-bold text-orange-600 bg-orange-50 px-3 py-1 rounded-full">Kapitoly 21–30</span>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-orange-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center mb-3 group-hover:bg-orange-500 transition-colors">
+                                <i class="fas fa-building text-orange-500 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-orange-500 uppercase tracking-wider">Kapitola 21</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Hypotéka</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-orange-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center mb-3 group-hover:bg-orange-500 transition-colors">
+                                <i class="fas fa-money-check text-orange-500 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-orange-500 uppercase tracking-wider">Kapitola 22</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Spotřebitelský úvěr</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-orange-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center mb-3 group-hover:bg-orange-500 transition-colors">
+                                <i class="fas fa-car text-orange-500 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-orange-500 uppercase tracking-wider">Kapitola 23</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Leasing</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-orange-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center mb-3 group-hover:bg-orange-500 transition-colors">
+                                <i class="fas fa-exclamation-circle text-orange-500 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-orange-500 uppercase tracking-wider">Kapitola 24</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">RPSN a poplatky</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-orange-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center mb-3 group-hover:bg-orange-500 transition-colors">
+                                <i class="fas fa-user-slash text-orange-500 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-orange-500 uppercase tracking-wider">Kapitola 25</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Předlužení</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-orange-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center mb-3 group-hover:bg-orange-500 transition-colors">
+                                <i class="fas fa-gavel text-orange-500 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-orange-500 uppercase tracking-wider">Kapitola 26</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Insolvence</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-orange-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center mb-3 group-hover:bg-orange-500 transition-colors">
+                                <i class="fas fa-file-contract text-orange-500 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-orange-500 uppercase tracking-wider">Kapitola 27</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Smlouvy o úvěru</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-orange-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center mb-3 group-hover:bg-orange-500 transition-colors">
+                                <i class="fas fa-store-slash text-orange-500 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-orange-500 uppercase tracking-wider">Kapitola 28</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Nebankování</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-orange-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center mb-3 group-hover:bg-orange-500 transition-colors">
+                                <i class="fas fa-balance-scale text-orange-500 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-orange-500 uppercase tracking-wider">Kapitola 29</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Dobrý vs. špatný dluh</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-orange-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center mb-3 group-hover:bg-orange-500 transition-colors">
+                                <i class="fas fa-undo-alt text-orange-500 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-orange-500 uppercase tracking-wider">Kapitola 30</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Refinancování</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sekce 4: Ochrana a plánování -->
+                <div class="mb-6">
+                    <div class="flex items-center gap-3 mb-5">
+                        <div class="w-1 h-8 bg-purple-500 rounded-full"></div>
+                        <h3 class="text-lg font-black text-slate-700 uppercase tracking-wider">Ochrana a plánování</h3>
+                        <div class="flex-1 h-px bg-slate-200"></div>
+                        <span class="text-xs font-bold text-purple-600 bg-purple-50 px-3 py-1 rounded-full">Kapitoly 31–40</span>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-purple-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center mb-3 group-hover:bg-purple-500 transition-colors">
+                                <i class="fas fa-shield-alt text-purple-500 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-purple-500 uppercase tracking-wider">Kapitola 31</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Pojištění základy</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-purple-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center mb-3 group-hover:bg-purple-500 transition-colors">
+                                <i class="fas fa-heartbeat text-purple-500 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-purple-500 uppercase tracking-wider">Kapitola 32</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Zdravotní pojištění</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-purple-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center mb-3 group-hover:bg-purple-500 transition-colors">
+                                <i class="fas fa-life-ring text-purple-500 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-purple-500 uppercase tracking-wider">Kapitola 33</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Životní pojištění</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-purple-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center mb-3 group-hover:bg-purple-500 transition-colors">
+                                <i class="fas fa-umbrella text-purple-500 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-purple-500 uppercase tracking-wider">Kapitola 34</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Pojištění majetku</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-purple-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center mb-3 group-hover:bg-purple-500 transition-colors">
+                                <i class="fas fa-user-clock text-purple-500 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-purple-500 uppercase tracking-wider">Kapitola 35</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Důchod a penze</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-purple-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center mb-3 group-hover:bg-purple-500 transition-colors">
+                                <i class="fas fa-calendar-check text-purple-500 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-purple-500 uppercase tracking-wider">Kapitola 36</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Rodinný rozpočet</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-purple-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center mb-3 group-hover:bg-purple-500 transition-colors">
+                                <i class="fas fa-first-aid text-purple-500 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-purple-500 uppercase tracking-wider">Kapitola 37</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Nouzový fond</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-purple-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center mb-3 group-hover:bg-purple-500 transition-colors">
+                                <i class="fas fa-bullseye text-purple-500 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-purple-500 uppercase tracking-wider">Kapitola 38</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Finanční cíle</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-purple-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center mb-3 group-hover:bg-purple-500 transition-colors">
+                                <i class="fas fa-ban text-purple-500 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-purple-500 uppercase tracking-wider">Kapitola 39</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Finanční podvody</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-purple-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
+                            <div class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center mb-3 group-hover:bg-purple-500 transition-colors">
+                                <i class="fas fa-graduation-cap text-purple-500 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-xs font-bold text-purple-500 uppercase tracking-wider">Kapitola 40</span>
+                            <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Finanční nezávislost</h4>
+                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-cv" class="tab-content hidden">
+                <h2 class="text-4xl font-black mb-6 text-slate-800 tracking-tight">Moje Kariéra a Znalosti</h2>
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 flex gap-8">
+                    <div class="w-1/3 border-r border-slate-100 pr-8 text-center">
+                        <div id="cv-avatar-display" class="text-8xl mb-4">👨‍🎓</div>
+                        <h3 class="text-2xl font-black text-slate-800">Student</h3>
+                        <p class="text-slate-500 mb-6" id="cv-title">Úroveň 1</p>
+                        <div class="bg-blue-50 p-4 rounded-xl text-left border border-blue-100">
+                            <p class="text-xs font-bold text-blue-800 uppercase mb-1">Správně zodpovězeno</p>
+                            <p class="text-3xl font-black text-blue-600" id="cv-correct">0</p>
+                        </div>
+                    </div>
+                    <div class="w-2/3">
+                        <h4 class="font-bold text-slate-800 mb-4 text-lg">Získané certifikáty a odměny</h4>
+                        <ul id="cv-perks" class="space-y-3">
+                            <li class="text-slate-500 italic">Zatím nic nevlastníš. Nakupuj v Tržnici.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <aside class="w-80 bg-white border-l border-slate-200 shadow-xl z-10 flex flex-col shrink-0">
+        <div class="p-6 bg-slate-900 text-white border-b border-slate-800 relative overflow-hidden">
+            <div class="absolute -right-4 -bottom-4 text-8xl opacity-10" id="side-avatar-bg">👨‍🎓</div>
+            <h3 class="font-black tracking-widest text-xs uppercase text-slate-400 mb-4">Herní čas</h3>
+            <div class="flex items-end gap-3">
+                <span class="text-5xl font-black" id="ui-month">1</span>
+                <span class="text-lg font-bold text-slate-300 mb-1">. měsíc</span>
+            </div>
+            <p class="text-sm text-blue-400 mt-2 font-bold" id="ui-year">Rok 2026</p>
+        </div>
+        
+        <div class="p-6 space-y-6 overflow-y-auto flex-1 bg-slate-50">
+            <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm">
+                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Hotovost v kapse</span>
+                <p class="text-3xl font-black text-emerald-600 mt-1" id="ui-cash">0 Kč</p>
+            </div>
+            <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-1 h-full bg-blue-500"></div>
+                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Komerční Banka</span>
+                <p class="text-2xl font-black text-slate-800 mt-1" id="ui-bank1">0 Kč</p>
+                <p class="text-xs text-blue-500 mt-1 font-bold">Úrok 2 % měsíčně</p>
+            </div>
+            <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-1 h-full bg-emerald-500"></div>
+                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Státní Dluhopisy</span>
+                <p class="text-2xl font-black text-slate-800 mt-1" id="ui-bonds">0 Kč</p>
+                <p class="text-xs text-emerald-600 mt-1 font-bold" id="ui-bonds-status">Nemáš žádné</p>
+            </div>
+            <div class="bg-slate-900 rounded-xl p-5 border border-slate-800 text-white shadow-lg relative overflow-hidden">
+                <i class="fas fa-chart-line absolute right-4 bottom-4 text-4xl opacity-20 text-yellow-500"></i>
+                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Portfolio Burza</span>
+                <p class="text-2xl font-black text-white mt-1" id="ui-stocks">0 ks</p>
+                <p class="text-xs text-yellow-400 mt-1 font-bold">Hodnota: <span id="ui-stocks-val">0</span> Kč</p>
+
+            </div>
+        </div>
+    </aside>
+
+    <script>
+        // --- LOGIKA A DATA ---
+                let state = {
+                    cash: 5000, bank: 0, bonds: [], stocksOwned: 0,
+                    month: 1, year: 2026, inflationRate: 0.0,
+                    avatarEmoji: '👨‍🎓', 
+                    items: ['skin_troll'], // ZMĚNA: Hráč už od začátku vlastní Trola
+                    correctAnswers: 0, transactions: [],
+                    activeSkin: 'avatar.png', skinFrames: 8, skinW: 64, skinH: 64
+                };
+
+                const stockPrices = [1000, 1050, 1100, 1200, 1150, 900, 750, 600, 550, 480, 500, 650, 800, 850, 950, 1100, 1250, 1300, 1400, 1500, 1600];
+                const gameEvents = [
+                    { month: 4, text: "Ekonomika šlape, lidé utrácí. Mírná inflace.", inf: 0.05 },
+                    { month: 6, text: "Krize! Ceny všeho letí nahoru kvůli externím vlivům.", inf: 0.25 },
+                    { month: 10, text: "Centrální banka zasáhla. Inflace začíná klesat.", inf: 0.10 },
+                    { month: 15, text: "Situace se stabilizovala. Ceny se vrací k normálu.", inf: 0.02 }
+                ];
+
+                const quizBank = [
+                    { q: "Co je to inflace?", opts: ["A) Úrok v bance", "B) Znehodnocování peněz (růst cen)", "C) Poplatek za výběr"], ans: 1 },
+                    { q: "Rozdíl mezi debetní a kreditní kartou?", opts: ["A) Žádný není", "B) Debetní jsou moje peníze, kreditní banky", "C) Debetní je pro firmy"], ans: 1 },
+                    { q: "Co je to hrubá mzda?", opts: ["A) To, co mi přijde na účet", "B) Mzda před odečtením daní", "C) Mzda po zdanění"], ans: 1 },
+                    { q: "Co je 'složené úročení'?", opts: ["A) Úrok z úroku", "B) Úrok, který platím dvakrát", "C) Pokuta za splátku"], ans: 0 },
+                    { q: "Koupil jsi akcie firmy. Co to znamená?", opts: ["A) Půjčil jsi jí peníze", "B) Vlastníš její malý podíl", "C) Platíš firmě daně"], ans: 1 }
+                ];
+
+                const shopItems = [
+                            { id: 'skin_troll', name: "Trol (Základní)", desc: "Tvůj původní vzhled.", basePrice: 0, type: 'skin', image: 'avatar.png', frames: 8, fw: 64, fh: 64, speed: 250, runSpeed: 450 },
+                            { id: 'perk_test', name: "Bodík k písemce", desc: "Záchrana pro reálný svět.", basePrice: 3000, type: 'perk', val: 'Omluvenka na malou písemku' },
+                            { id: 'skin_fox', name: "Liška", desc: "Zvířecí skin postavy pro pohyb ve městě.", basePrice: 4500, type: 'skin', image: 'avatar_liska.png', frames: 6, fw: 32, fh: 32, dirMap: [0, 2, 1, 3], speed: 250, runSpeed: 450 },
+                            { id: 'skin_lizard', name: "Ještěr", desc: "Rychlý a hbitý plaz (2x rychlejší pohyb).", basePrice: 4000, type: 'skin', image: 'lizard.png', frames: 9, fw: 64, fh: 64, shopY: -128, dirMap: [2, 3, 0, 1], speed: 500, runSpeed: 900 }
+                        ];
+                function initGame() {
+                            updateAll();
+                            switchTab('dashboard');
+                            
+                            // PŘIDÁNO: Přidá legendu ovládání pod mapu
+                            addControlsLegend();
+                            
+                            requestAnimationFrame(gameLoop);
+                        }
+
+                function logTx(desc, amount) {
+                    if(amount === 0) return;
+                    state.cash += amount;
+                    state.transactions.unshift({ m: state.month, y: state.year, desc, amt: amount, bal: state.cash });
+                    updateAll();
+                }
+
+        //legenda ovládání
+                function addControlsLegend() {
+                            const tabGame = document.getElementById('tab-game');
+                            if (!tabGame || document.getElementById('controls-legend')) return;
+
+                            const legendHtml = `
+                           <div id="controls-legend"
+                                class="mt-0 bg-white p-6 rounded-2xl shadow-sm text-slate-800 max-w-4xl mx-auto">
+
+                                <div class="text-xs font-bold uppercase text-slate-400 mb-6 tracking-widest flex items-center gap-2 border-b border-slate-100 pb-2">
+                                    <i class="fas fa-gamepad text-slate-500"></i> Ovládání postavy
+                                </div>
+                                
+                                <div class="flex items-start justify-between text-left px-10">
+                                    <div>
+                                        <div class="font-bold text-[11px] uppercase tracking-wider mb-4 text-slate-500">Pohyb</div>
+                                        <div style="position: relative; width: 100px; height: 80px;">
+                                            <div id="key-w" class="sprite-key key-std" style="position: absolute; left: 32px; top: 0px; --bg-x: -128px; --bg-y: -32px;"></div>
+                                            <div id="key-a" class="sprite-key key-std" style="position: absolute; left: 0px; top: 32px; --bg-x: -80px; --bg-y: -48px;"></div>
+                                            <div id="key-s" class="sprite-key key-std" style="position: absolute; left: 32px; top: 32px; --bg-x: -96px; --bg-y: -48px;"></div>
+                                            <div id="key-d" class="sprite-key key-std" style="position: absolute; left: 64px; top: 32px; --bg-x: -112px; --bg-y: -48px;"></div>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <div class="font-bold text-[11px] uppercase tracking-wider mb-4 text-slate-500">Nebo Šipky</div>
+                                        <div style="position: relative; width: 100px; height: 80px;">
+                                            <div id="key-up" class="sprite-key key-std" style="position: absolute; left: 32px; top: 0px; --bg-x: -192px; --bg-y: -64px;"></div>
+                                            <div id="key-left" class="sprite-key key-std" style="position: absolute; left: 0px; top: 32px; --bg-x: 0px; --bg-y: -80px;"></div>
+                                            <div id="key-down" class="sprite-key key-std" style="position: absolute; left: 32px; top: 32px; --bg-x: -208px; --bg-y: -64px;"></div>
+                                            <div id="key-right" class="sprite-key key-std" style="position: absolute; left: 64px; top: 32px; --bg-x: -16px; --bg-y: -80px;"></div>
+                                        </div>
+                                    </div>
+
+                                    <div style="width:80px;">
+                                        <div class="font-bold text-[11px] uppercase tracking-wider mb-4 text-slate-500">
+                                            Sprint
+                                        </div>
+                                        <div style="width:80px; height:32px; position:relative; overflow:hidden;">
+                                            <div id="key-shift"
+                                                 class="sprite-key key-shift"
+                                                 style="--bg-x:-100px; --bg-y:-96.15px;">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div style="width:150px;">
+                                        <div class="font-bold text-[11px] uppercase tracking-wider mb-4 text-slate-500">
+                                            Akce / Budovy
+                                        </div>
+                                        <div style="width:150px; height:32px; position:relative;">
+                                            <div id="key-space"
+                                                 class="sprite-key key-space"
+                                                 style="--bg-x:-9px; --bg-y:-112px;">
+                                            </div>
+                                        </div>
+                                    </div>                             
+                                 </div>
+                            </div>
+                            `;
+
+                            tabGame.insertAdjacentHTML('beforeend', legendHtml);
+                        }
+
+        function advanceTime() {
+                    state.month++;
+                    if(state.month > 12) { state.month = 1; state.year++; }
+                    
+                    // OPRAVA: Výpočet celkového počtu měsíců od začátku hry (září 2026 = 1)
+                    let totalGameMonths = ((state.year - 2026) * 12) + state.month;
+                    
+                    if (typeof window.advanceMarketMonth === 'function') {
+                        window.advanceMarketMonth(totalGameMonths); 
+                    }
+
+                    if((state.savings || 0) > 0) {
+                        let urok = Math.floor((state.savings * 0.02) / 12); 
+                        state.savings += urok;
+                        state.transactions.unshift({ m: state.month, y: state.year, desc: 'Úrok ze spoření (2 % p.a.)', amt: urok, acc: 'savings' });
+                    }
+
+                    let bondsHtml = "";
+                    for (let i = state.bonds.length - 1; i >= 0; i--) {
+                        let b = state.bonds[i];
+                        if (state.year > b.uY || (state.year === b.uY && state.month >= b.uM)) {
+                            logTx(`Výplata Dluhopisu`, b.finalValue);
+                            bondsHtml += `<p class='text-emerald-600 font-bold'>Vyplacen dluhopis: +${b.finalValue} Kč!</p>`;
+                            state.bonds.splice(i, 1);
+                        }
+                    }
+
+                    let evt = gameEvents.find(e => e.month === totalGameMonths);
+                    if(evt) {
+                        state.inflationRate = evt.inf;
+                        document.getElementById('event-banner').classList.remove('hidden');
+                        document.getElementById('event-text').innerText = evt.text;
+                        setTimeout(() => document.getElementById('event-banner').classList.add('hidden'), 8000);
+                    }
+                    if(bondsHtml !== "") showModal("Státní dluhopisy", "Některé tvé investice právě dospěly!", "Super", null, bondsHtml);
+                    
+                    updateAll(); renderShop();
+                }
+
+        function updateAll() {
+            document.getElementById('ui-cash').innerText = state.cash.toLocaleString() + " Kč"; // Zobrazení hotovosti
+            document.getElementById('dash-balance').innerText = state.bank.toLocaleString() + " CZK na účtu";
+            document.getElementById('ui-bank1').innerText = state.bank.toLocaleString() + " Kč";
+            document.getElementById('ui-bonds').innerText = state.bonds.reduce((acc, b) => acc + b.amount, 0).toLocaleString() + " Kč";
+            
+            let currentPrice = stockPrices[Math.min(((state.year-2026)*12 + state.month - 1), stockPrices.length-1)] || stockPrices[stockPrices.length-1];
+            document.getElementById('ui-stocks').innerText = state.stocksOwned + " ks";
+            document.getElementById('ui-stocks-val').innerText = (state.stocksOwned * currentPrice).toLocaleString();
+            
+            document.getElementById('ui-month').innerText = state.month;
+            document.getElementById('ui-year').innerText = "Rok " + state.year;
+            document.getElementById('shop-inflation').innerText = (state.inflationRate * 100).toFixed(0) + " %";
+            
+            document.getElementById('side-avatar-bg').innerText = state.avatarEmoji;
+            document.getElementById('cv-avatar-display').innerText = state.avatarEmoji;
+            document.getElementById('cv-correct').innerText = state.correctAnswers;
+
+            document.getElementById('tx-table-body').innerHTML = state.transactions.map(tx => `
+                <tr class="border-b border-slate-50 hover:bg-slate-50 transition">
+                    <td class="p-4 text-slate-500 font-medium">${tx.m}/${tx.y}</td>
+                    <td class="p-4 text-slate-800 font-bold">${tx.desc}</td>
+                    <td class="p-4 text-right font-black ${tx.amt > 0 ? 'text-emerald-600' : 'text-slate-900'}">${tx.amt > 0 ? '+'+tx.amt : tx.amt} Kč</td>
+                    <td class="p-4 text-right text-slate-500 font-mono">${tx.bal} Kč</td>
+                </tr>
+            `).join('');
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById('tab-' + tabId).classList.remove('hidden');
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('text-emerald-400', 'bg-slate-800', 'border-emerald-400', 'font-bold');
+                btn.classList.add('text-slate-300', 'border-transparent');
+            });
+            const activeBtn = document.querySelector(`[onclick="switchTab('${tabId}')"]`);
+            if(activeBtn) activeBtn.classList.add('bg-slate-800', 'text-emerald-400', 'border-emerald-400', 'font-bold');
+            if(tabId === 'shop') renderShop();
+            if(tabId === 'game') document.getElementById('gameCanvas').focus();
+        }
+        // === FULLSCREEN LOGIKA OPRAVA ===
+                window.toggleFullscreen = () => {
+                    // Zvětšujeme CELOU stránku, ne jen plátno
+                    const elem = document.documentElement; 
+                    if (!document.fullscreenElement) {
+                        elem.requestFullscreen().catch(err => {
+                            alert(`Chyba fullscreenu: ${err.message}`);
+                        });
+                    } else {
+                        document.exitFullscreen();
+                    }
+                };
+
+                // Když se fullscreen aktivuje (nebo vypne přes ESC), přepneme CSS třídy
+                document.addEventListener('fullscreenchange', () => {
+                    const icon = document.querySelector('#fullscreen-btn i');
+                    if (document.fullscreenElement) {
+                        // Přidáme speciální třídu na body, která skryje levé menu
+                        document.body.classList.add('fullscreen-mode');
+                        icon.classList.remove('fa-expand');
+                        icon.classList.add('fa-compress');
+                    } else {
+                        // Vrátíme vše do normálu
+                        document.body.classList.remove('fullscreen-mode');
+                        icon.classList.remove('fa-compress');
+                        icon.classList.add('fa-expand');
+                    }
+                });
+        function renderShop() {
+            document.getElementById('shop-container').innerHTML = shopItems.map(item => {
+                let p = Math.floor(item.basePrice * (1 + state.inflationRate));
+                let bought = state.items.includes(item.id);
+                return `
+                <div class="bg-white border ${bought?'border-emerald-400':'border-slate-200'} rounded-2xl p-6 flex flex-col justify-between">
+                    <div class="text-5xl mb-4">${item.type==='avatar'?item.val:'📜'}</div>
+                    <h3 class="font-black text-xl">${item.name}</h3>
+                    <p class="text-sm text-slate-500 mt-2 mb-4 h-10">${item.desc}</p>
+                    <button onclick="buyItem('${item.id}', ${p})" ${bought?'disabled':''} class="w-full ${bought?'bg-emerald-500':'bg-slate-900'} text-white font-bold py-3 rounded-xl">
+                        ${bought ? 'Vlastníš' : `Koupit (${p} Kč)`}
+                    </button>
+                </div>`;
+            }).join('');
+        }
+
+        function buyItem(id, price) {
+            if(state.cash >= price) {
+                logTx("Nákup: " + shopItems.find(i=>i.id===id).name, -price);
+                state.items.push(id);
+                const item = shopItems.find(i => i.id === id);
+                if(item.type === 'avatar') state.avatarEmoji = item.val;
+                if(item.type === 'perk') {
+                    const perksEl = document.getElementById('cv-perks');
+                    if(perksEl) {
+                        if(perksEl.innerHTML.includes('Zatím nic')) perksEl.innerHTML = '';
+                        perksEl.innerHTML += `<li class="font-bold text-emerald-600">✔️ ${item.val}</li>`;
+                    }
+                }
+                updateAll(); 
+                window.openShopModal(); // Okamžitý překreslení okna tržnice a inventáře
+            } else { 
+                alert("Na tento nákup nemáš dostatek hotovosti!"); 
+            }
+        }
+        window.equipSkin = (id) => {
+                    const item = shopItems.find(i => i.id === id);
+                    if (!item) return;
+                    
+                    if (item.type === 'skin') {
+                        state.activeSkin = item.image;
+                        state.skinFrames = item.frames;
+                        state.skinW = item.fw;
+                        state.skinH = item.fh;
+                        state.skinDirMap = item.dirMap || [0, 1, 2, 3];
+                        playerSpriteImage.src = item.image; 
+
+                        // ZMĚNA: Nastavení rychlosti postavy podle skinu
+                        player.speed = item.speed || 250;
+                        player.runSpeed = item.runSpeed || 450;
+
+                    } else if (item.type === 'avatar') {
+                        state.avatarEmoji = item.val;
+                    }
+                    
+                    updateAll();
+                    window.openShopModal(); 
+                };
+        window.openShopModal = () => {
+            try {
+                const modalContent = document.getElementById('game-modal-content');
+                if (modalContent) modalContent.className = 'bg-slate-50 rounded-3xl p-6 max-w-6xl w-full shadow-2xl border border-slate-200 relative';
+
+                const fmt = (n) => (n || 0).toLocaleString('cs-CZ');
+
+               // Generování zboží k nákupu
+                       const marketHtml = shopItems.map(item => {
+                           let p = Math.floor(item.basePrice * (1 + state.inflationRate));
+                           let bought = state.items.includes(item.id);
+                           
+                           // Automatický přepočet měřítka, aby se ikona vešla přesně do boxu 48x48px
+                           let scale = 48 / (item.fw || 32);
+                           let icon = item.type === 'skin' 
+                               ? `<div style="width: 48px; height: 48px; overflow: hidden; position: relative;"><div style="width:${item.fw}px; height:${item.fh}px; background:url('${item.image}') 0px ${item.shopY || 0}px; image-rendering:pixelated; transform:scale(${scale}); transform-origin:left top; position:absolute; top:0; left:0;"></div></div>`
+                               : `<div style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; font-size: 2rem;">${item.type==='avatar'?item.val:'📜'}</div>`;
+
+                           return `
+                           <div class="bg-white border ${bought?'border-emerald-400':'border-slate-200'} rounded-2xl p-4 flex flex-col justify-between shadow-sm">
+                               <div class="flex justify-between items-center mb-2">
+                                   ${icon}
+                                   <span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${item.type==='avatar'||item.type==='skin'?'bg-purple-100 text-purple-700':'bg-blue-100 text-blue-700'}">${item.type==='skin'?'Skin':(item.type==='avatar'?'Avatar':'Perk')}</span>
+                               </div>
+                               <h4 class="font-black text-sm mt-2 text-slate-800">${item.name}</h4>
+                               <p class="text-[11px] text-slate-500 mt-1 mb-3 h-8 leading-tight">${item.desc}</p>
+                               <button onclick="buyItem('${item.id}', ${p})" ${bought?'disabled':''} class="w-full ${bought?'bg-emerald-500 cursor-not-allowed':'bg-slate-900 hover:bg-slate-800'} text-white font-bold py-2 rounded-lg text-[11px] transition">
+                                   ${bought ? 'Vlastníš' : `Koupit (${fmt(p)} Kč)`}
+                               </button>
+                           </div>`;
+                       }).join('');
+               // Generování inventáře vlastněných věcí
+                       const inventoryHtml = shopItems.filter(item => state.items.includes(item.id)).map(item => {
+                           // Přepočet do menšího boxu 32x32px pro inventář
+                           let scaleInv = 32 / (item.fw || 32);
+                           let icon = item.type === 'skin' 
+                               ? `<div style="width: 32px; height: 32px; overflow: hidden; position: relative;"><div style="width:${item.fw}px; height:${item.fh}px; background:url('${item.image}') 0px ${item.shopY || 0}px; image-rendering:pixelated; transform:scale(${scaleInv}); transform-origin:left top; position:absolute; top:0; left:0;"></div></div>`                               : `<div style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">${item.type==='avatar'?item.val:'📜'}</div>`;
+                           
+                           let isActive = (item.type === 'skin' && state.activeSkin === item.image) || (item.type === 'avatar' && state.avatarEmoji === item.val);
+
+                           return `
+                           <div class="flex items-center gap-3 bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm text-slate-800">
+                               ${icon}
+                               <div class="flex-1 min-w-0">
+                                   <div class="font-bold text-xs truncate">${item.name}</div>
+                                   <div class="text-[10px] text-slate-400 truncate">${item.type==='skin'?'Herní skin postavy':(item.type==='avatar'?'Vzhled v panelu':'Aktivní výhoda')}</div>
+                               </div>
+                               ${(item.type === 'skin' || item.type === 'avatar') ? `
+                                   <button onclick="equipSkin('${item.id}')" class="px-3 py-1 rounded text-[10px] font-bold uppercase ${isActive ? 'bg-emerald-100 text-emerald-700 cursor-default' : 'bg-slate-800 text-white hover:bg-slate-700'}" ${isActive?'disabled':''}>
+                                       ${isActive ? 'Aktivní' : 'Použít'}
+                                   </button>
+                               ` : ''}
+                           </div>`;
+                       }).join('') || '<div class="text-xs text-slate-400 italic text-center py-8">Zatím nevlastníš žádné věci.</div>';
+
+                showModal(
+                    "FinMarket | Tržnice a Inventář",
+                    "", "Zavřít", null,
+                    `
+                    <div class="grid grid-cols-12 gap-6 w-full text-slate-800 text-left" style="font-family: sans-serif; min-height: 400px;">
+                        <div class="col-span-8 flex flex-col gap-4">
+                            <div class="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                                <div>
+                                    <h3 class="font-bold text-slate-700 text-sm">Aktuální nabídka tržnice</h3>
+                                    <p class="text-[11px] text-slate-400">Ceny reagují na inflaci ve městě</p>
+                                </div>
+                                <div class="bg-red-50 px-3 py-1 rounded-lg border border-red-100 text-right">
+                                    <span class="text-[10px] font-bold text-red-800 uppercase tracking-wider block">Inflace</span>
+                                    <span class="text-base font-black text-red-600">${(state.inflationRate * 100).toFixed(0)} %</span>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 overflow-y-auto max-h-[350px] pr-1">
+                                ${marketHtml}
+                            </div>
+                        </div>
+                        <div class="col-span-4 flex flex-col bg-slate-900 text-white p-4 rounded-xl shadow-lg">
+                            <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 border-b border-slate-700 pb-2">
+                                <i class="fas fa-boxes text-yellow-500 mr-1"></i> Můj Inventář (${state.items.length})
+                            </div>
+                            <div class="flex flex-col gap-2 overflow-y-auto max-h-[350px] pr-1">
+                                ${inventoryHtml}
+                            </div>
+                        </div>
+                    </div>
+                    `
+                );
+            } catch (error) {
+                alert("Chyba tržnice: " + error.message);
+            }
+        };
+
+        let mCb = null;
+        function showModal(title, text, btn, cb, customHtml = "") {
+                    const modal = document.getElementById('game-modal');
+                    modal.classList.remove('hidden');
+                    
+                    // Přidali jsme třídu "relative z-50", aby tlačítka byla "nad" vším ostatním
+                    document.getElementById('game-modal-content').innerHTML = `
+                        <div class="relative z-50">
+                            <h3 class="text-3xl font-black mb-2">${title}</h3>
+                            <p class="text-slate-600 mb-6">${text}</p>
+                            <div class="relative z-50">${customHtml}</div>
+                            ${btn ? `<button onclick="closeModal()" class="w-full mt-6 bg-slate-900 text-white font-black py-4 rounded-xl relative z-50 hover:bg-slate-800 transition">${btn}</button>` : ''}
+                        </div>
+                    `;
+                    mCb = cb;
+                }
+        function closeModal() { 
+                    document.getElementById('game-modal').classList.add('hidden'); 
+                    
+                    // OBNOVIT ANIMACI, POKUD STOJÍ U BUDOVY
+                    if (activeTrigger > 0) {
+                        const overlay = document.getElementById('interaction-overlay');
+                        if (overlay) overlay.style.display = 'block';
+                    }
+
+                    if(mCb) mCb(); 
+                    mCb = null; 
+                }
+
+        // Interakce s budovami ve hře
+        // --- HLAVNÍ FUNKCE BANKY ---
+window.intB1 = () => {
+    try {
+        // 1. Ošetření starých dat a příprava účtů
+        state.loans = state.loans || [];
+        if (state.loan > 0) { 
+            state.loans.push({ id: Date.now(), amount: state.loan, remaining: state.loan, emi: Math.ceil(state.loan/12), interest: 5.9, apr: 6.2, months: 12, startM: state.month, startY: state.year });
+            state.loan = 0;
+        }
+
+        const account = state.bank || 0;
+        const savings = state.savings || 0;
+        const totalBorrowed = state.loans.reduce((sum, l) => sum + l.amount, 0); // Počítáme jen původní půjčenou jistinu
+        const deposits = account + savings;
+                
+        // Vlastní peníze = všechny vklady MÍNUS peníze z úvěrů
+        const ownMoney = Math.max(0, deposits - totalBorrowed);
+        const maxLoan = Math.floor(ownMoney * 0.5); // Max 50 % z tvých vlastních peněz
+        const availLoan = Math.max(0, maxLoan - totalBorrowed); // Z limitu odečteme to, co už sis půjčil
+
+        const fmt = (n) => (n || 0).toLocaleString('cs-CZ');
+
+        // Filtrace a příprava transakcí
+        const accTxs = (state.transactions || []).filter(t => t.acc === 'bank' || !t.acc).slice(0, 8);
+        const savTxs = (state.transactions || []).filter(t => t.acc === 'savings').slice(0, 8);
+
+        const renderTxs = (txs) => txs.map(t => {
+            const amt = t.amt !== undefined ? t.amt : (t.amount || 0);
+            const isPos = amt > 0;
+            return `<div class="flex justify-between text-[11px] border-b border-slate-100 pb-1.5 mb-1.5">
+                        <span class="text-slate-600 truncate pr-2">${t.desc || 'Transakce'}</span>
+                        <span class="${isPos ? 'text-emerald-600' : 'text-red-600'} font-bold">${isPos ? '+' : ''}${fmt(amt)} Kč</span>
+                    </div>`;
+        }).join("") || '<div class="text-xs text-slate-400 italic">Zatím žádné pohyby</div>';
+
+        // Příprava přehledu úvěrů
+        const loansHtml = state.loans.length > 0 ? state.loans.map((l, i) => `
+            <div class="bg-slate-800 p-3 rounded-lg border border-slate-700 mb-2 flex justify-between items-center">
+                <div>
+                    <div class="text-[10px] text-slate-400 uppercase">Zůstatek k doplacení</div>
+                    <div class="font-bold text-red-400 text-sm">${fmt(l.remaining)} Kč</div>
+                    <div class="text-[10px] text-slate-500 mt-1">Splátka: ${fmt(l.emi)} Kč/měs.</div>
+                </div>
+                <button onclick="showContract(${i})" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded text-xs font-bold transition">Smlouva</button>
+            </div>
+        `).join("") : '<div class="text-xs text-slate-500 italic mt-2">Nemáte žádné aktivní úvěry.</div>';
+
+        // Roztažení okna pro desktop
+        const modalContent = document.getElementById('game-modal-content');
+        if (modalContent) modalContent.className = 'bg-slate-50 rounded-3xl p-6 max-w-6xl w-full shadow-2xl border border-slate-200 relative';
+
+        showModal(
+            "Komerční banka | Internetové bankovnictví",
+            "", "Zavřít", null,
+            `
+            <div class="grid grid-cols-12 gap-6 w-full text-slate-800" style="font-family: sans-serif; min-height: 550px;">
+                
+                <div id="contractOverlay" class="absolute inset-0 bg-slate-900/90 z-50 hidden flex-col items-center justify-center p-8 rounded-3xl backdrop-blur-sm">
+                    <div class="bg-white p-8 rounded-xl max-w-2xl w-full shadow-2xl relative">
+                        <button onclick="document.getElementById('contractOverlay').style.display='none'" class="absolute top-4 right-4 text-slate-400 hover:text-red-600 font-bold text-xl">&times;</button>
+                        <div id="contractContent" class="text-sm text-slate-700 space-y-4"></div>
+                    </div>
+                </div>
+
+                <div class="col-span-7 flex flex-col gap-4">
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">Běžný účet (CZK)</div>
+                                <div class="text-[11px] font-mono text-slate-500 mt-0.5">CZ85 0100 0000 0012 3456 7890</div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-3xl font-black text-slate-900">${fmt(account)} Kč</div>
+                            </div>
+                        </div>
+                        <div class="text-[10px] font-bold text-slate-400 uppercase mb-2 border-b pb-1">Historie transakcí</div>
+                        <div class="overflow-y-auto max-h-32 pr-2">${renderTxs(accTxs)}</div>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <div class="text-xs font-bold text-slate-400 uppercase tracking-wider text-purple-600">Spořicí účet (CZK)</div>
+                                <div class="text-[11px] font-mono text-slate-500 mt-0.5">CZ12 0100 0000 0098 7654 3210</div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-3xl font-black text-slate-900">${fmt(savings)} Kč</div>
+                                <div class="text-[10px] text-purple-500 font-bold mt-1">Zhodnocení 2 % p.a.</div>
+                            </div>
+                        </div>
+                        <div class="text-[10px] font-bold text-slate-400 uppercase mb-2 border-b pb-1">Historie transakcí</div>
+                        <div class="overflow-y-auto max-h-32 pr-2">${renderTxs(savTxs)}</div>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                        <div class="text-xs font-bold text-slate-700 uppercase mb-3">Hotovost (Vklad / Výběr)</div>
+                        <div class="flex gap-3 items-end">
+                            <div class="flex-1">
+                                <label class="text-[10px] text-slate-500 font-bold block mb-1">Částka v Kč</label>
+                                <input id="cashDepositAmt" type="number" min="1"
+                                    class="w-full border border-slate-300 p-2 rounded text-sm focus:border-emerald-500 outline-none"
+                                    placeholder="Zadejte částku...">
+                            </div>
+                            <button onclick="handleCashDeposit('vklad')" class="bg-emerald-600 text-white px-4 py-2 rounded font-bold text-xs hover:bg-emerald-700">
+                                Vložit
+                            </button>
+                            <button onclick="handleCashDeposit('vyber')" class="bg-slate-600 text-white px-4 py-2 rounded font-bold text-xs hover:bg-slate-700">
+                                Vybrat
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                        <div class="text-xs font-bold text-slate-700 uppercase mb-3">Vnitřní převod mezi účty</div>
+                        <div class="flex gap-3 items-end">
+                            <div class="flex-1">
+                                <label class="text-[10px] text-slate-500 font-bold block mb-1">Částka v Kč</label>
+                                <input id="transferAmt" type="number" min="1" class="w-full border border-slate-300 p-2 rounded text-sm focus:border-blue-500 outline-none" placeholder="0">
+                            </div>
+                            <button onclick="handleTransfer('toSavings')" class="bg-purple-600 text-white px-4 py-2 rounded font-bold text-xs hover:bg-purple-700">Na spoření</button>
+                            <button onclick="handleTransfer('toBank')" class="bg-blue-600 text-white px-4 py-2 rounded font-bold text-xs hover:bg-blue-700">Na běžný účet</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-span-5 flex flex-col gap-4">
+                    <div class="bg-slate-900 text-white p-5 rounded-xl shadow-lg flex-1">
+                        <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-700 pb-2">Moje aktivní úvěry</div>
+                        <div class="overflow-y-auto max-h-48 pr-2">${loansHtml}</div>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm border-t-4 border-t-red-500">
+                        <div class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Žádost o spotřebitelský úvěr</div>
+                        <div class="text-[11px] text-slate-500 mb-4">Maximální předschválený limit: <b class="text-emerald-600">${fmt(availLoan)} Kč</b></div>
+                        
+                        <input id="newLoanAmt" oninput="updateLoanPreview()" type="number" min="1" max="${availLoan}" class="w-full border border-slate-300 p-2 rounded text-sm mb-3 focus:border-red-500 outline-none" placeholder="Zadejte požadovanou částku...">
+                        
+                        <div id="loanPreview" class="bg-slate-50 p-3 rounded border border-slate-200 text-xs text-slate-600 mb-4 hidden space-y-1">
+                            <div class="flex justify-between"><span>Úroková sazba:</span> <b class="text-slate-900">5,9 % p.a.</b></div>
+                            <div class="flex justify-between"><span>RPSN:</span> <b class="text-slate-900">6,2 %</b></div>
+                            <div class="flex justify-between"><span>Doba splatnosti:</span> <b class="text-slate-900">12 měsíců</b></div>
+                            <div class="flex justify-between border-t border-slate-200 pt-1 mt-1"><span>Měsíční splátka:</span> <b id="previewEmi" class="text-red-600">0 Kč</b></div>
+                            <div class="flex justify-between"><span>Celkem zaplatíte:</span> <b id="previewTotal" class="text-slate-900">0 Kč</b></div>
+                        </div>
+
+                        <button onclick="handleBorrow()" class="w-full bg-red-600 text-white py-3 rounded font-black text-sm hover:bg-red-700 shadow-lg">Podepsat smlouvu a čerpat</button>
+                        <div class="text-[9px] text-center text-slate-400 mt-3">* Splátka bude automaticky stržena z Běžného účtu každý měsíc.</div>
+                    </div>
+                </div>
+            </div>
+            `
+        );
+    } catch (error) {
+        alert("Došlo k chybě při načítání banky: " + error.message);
+        console.error(error);
+    }
+};
+
+// --- POMOCNÉ FUNKCE PRO BANKU (Bezpečně definované v globálním prostoru) ---
+
+window.showContract = (idx) => {
+    const l = state.loans[idx];
+    const fmt = (n) => (n || 0).toLocaleString('cs-CZ');
+    const content = `
+        <div class="text-center mb-6 border-b pb-4">
+            <h2 class="text-xl font-black uppercase tracking-widest text-slate-900">Smlouva o spotřebitelském úvěru</h2>
+            <p class="text-xs text-slate-500">Evidenční číslo: ${l.id}</p>
+        </div>
+        <div class="space-y-3 text-sm text-justify leading-relaxed">
+            <p><b>Smluvní strany:</b> Komerční banka, a.s. (dále jen "Věřitel") a Klient (dále jen "Dlužník").</p>
+            <p>Věřitel se zavazuje poskytnout Dlužníkovi úvěr ve výši <b>${fmt(l.amount)} Kč</b>. Částka byla jednorázově převedena na Běžný účet Dlužníka.</p>
+            <div class="bg-slate-50 p-4 rounded border border-slate-200 my-4">
+                <ul class="list-disc pl-5 space-y-1">
+                    <li><b>Sjednaná úroková sazba:</b> ${l.interest} % p.a.</li>
+                    <li><b>RPSN:</b> ${l.apr} %</li>
+                    <li><b>Doba splatnosti:</b> ${l.months} měsíců</li>
+                    <li><b>Výše měsíční splátky:</b> ${fmt(l.emi)} Kč</li>
+                    <li><b>Celková částka k úhradě:</b> ${fmt(l.emi * l.months)} Kč</li>
+                </ul>
+            </div>
+            <p><b>Podmínky splácení:</b> Dlužník souhlasí s automatickým inkasem splátky z Běžného účtu vždy 1. den v měsíci počínaje měsícem následujícím po podpisu této smlouvy (${l.startM}/${l.startY}). V případě nedostatku prostředků může být Běžný účet přečerpán do debetu.</p>
+            <div class="grid grid-cols-2 mt-8 pt-8 border-t text-center">
+                <div><div class="border-b border-slate-400 w-3/4 mx-auto mb-2"></div><span class="text-xs text-slate-500">Podpis Věřitele</span></div>
+                <div><div class="border-b border-slate-400 w-3/4 mx-auto mb-2 font-black font-serif italic text-blue-800 text-lg">Podepsáno elektronicky</div><span class="text-xs text-slate-500">Podpis Dlužníka</span></div>
+            </div>
+        </div>
+    `;
+    const contentDiv = document.getElementById('contractContent');
+    const overlayDiv = document.getElementById('contractOverlay');
+    if(contentDiv && overlayDiv) {
+        contentDiv.innerHTML = content;
+        overlayDiv.style.display = 'flex';
+    }
+};
+
+window.handleTransfer = (direction) => {
+    const amtInput = document.getElementById('transferAmt');
+    if (!amtInput) return;
+    const amt = Math.floor(Number(amtInput.value));
+    if (!amt || amt <= 0) return alert("Zadejte platnou částku.");
+
+    if (direction === 'toSavings') {
+        if ((state.bank || 0) < amt) return alert("Nedostatek prostředků na Běžném účtu.");
+        state.bank -= amt; 
+        state.savings = (state.savings || 0) + amt;
+        state.transactions.unshift({ m: state.month, y: state.year, desc: 'Převod na spořicí účet', amt: -amt, acc: 'bank' });
+        state.transactions.unshift({ m: state.month, y: state.year, desc: 'Příchozí převod z běžného ú.', amt: amt, acc: 'savings' });
+    } else {
+        if ((state.savings || 0) < amt) return alert("Nedostatek prostředků na Spořicím účtu.");
+        state.savings -= amt; 
+        state.bank = (state.bank || 0) + amt;
+        state.transactions.unshift({ m: state.month, y: state.year, desc: 'Výběr na běžný účet', amt: -amt, acc: 'savings' });
+        state.transactions.unshift({ m: state.month, y: state.year, desc: 'Příchozí převod ze spoření', amt: amt, acc: 'bank' });
+    }
+    updateAll(); closeModal(); intB1();
+};
+window.handleCashDeposit = (action) => {
+    const input = document.getElementById('cashDepositAmt');
+    if (!input) return;
+    const amt = Math.floor(Number(input.value));
+
+    if (!amt || amt <= 0) return alert("Zadejte platnou částku větší než 0.");
+
+    if (action === 'vklad') {
+        if (amt > state.cash) return alert(`Zamítnuto: Nemáte u sebe tolik hotovosti. V peněžence máte ${state.cash} Kč.`);
+        state.cash -= amt;
+        state.bank = (state.bank || 0) + amt;
+        state.transactions.unshift({ m: state.month, y: state.year, desc: 'Vklad hotovosti', amt: amt, acc: 'bank' });
+    } else if (action === 'vyber') {
+        if (amt > (state.bank || 0)) return alert(`Zamítnuto: Nedostatek prostředků. Na Běžném účtu máte ${state.bank || 0} Kč.`);
+        state.bank -= amt;
+        state.cash += amt;
+        state.transactions.unshift({ m: state.month, y: state.year, desc: 'Výběr hotovosti', amt: -amt, acc: 'bank' });
+    }
+    
+    updateAll(); closeModal(); intB1();
+};
+window.updateLoanPreview = () => {
+    const amtInput = document.getElementById('newLoanAmt');
+    const preview = document.getElementById('loanPreview');
+    if (!amtInput || !preview) return;
+    
+    const amt = Math.floor(Number(amtInput.value));
+    if (amt > 0) {
+        preview.style.display = 'block';
+        const monthlyRate = 0.059 / 12;
+        const emi = Math.ceil(amt * (monthlyRate * Math.pow(1 + monthlyRate, 12)) / (Math.pow(1 + monthlyRate, 12) - 1));
+        document.getElementById('previewEmi').innerText = emi.toLocaleString('cs-CZ') + " Kč";
+        document.getElementById('previewTotal').innerText = (emi * 12).toLocaleString('cs-CZ') + " Kč";
+    } else {
+        preview.style.display = 'none';
+    }
+};
+
+window.handleBorrow = () => {
+    const amtInput = document.getElementById('newLoanAmt');
+    if (!amtInput) return;
+    const amt = Math.floor(Number(amtInput.value));
+    if (!amt || amt <= 0) return alert("Zadejte požadovanou částku.");
+    
+    const deposits = (state.bank || 0) + (state.savings || 0);
+    const totalBorrowed = (state.loans || []).reduce((sum, l) => sum + l.amount, 0);
+    const ownMoney = Math.max(0, deposits - totalBorrowed);
+    const maxLoan = Math.floor(ownMoney * 0.5);
+        
+    if (totalBorrowed + amt > maxLoan) return alert("Zamítnuto. Překročili byste povolený limit úvěrové angažovanosti.");
+
+    const monthlyRate = 0.059 / 12;
+    const emi = Math.ceil(amt * (monthlyRate * Math.pow(1 + monthlyRate, 12)) / (Math.pow(1 + monthlyRate, 12) - 1));
+    const totalPayable = emi * 12;
+
+    state.bank = (state.bank || 0) + amt;
+    state.loans = state.loans || [];
+    state.loans.push({
+        id: Date.now() + Math.floor(Math.random()*1000),
+        amount: amt, remaining: totalPayable, emi: emi, 
+        interest: 5.9, apr: 6.2, months: 12, startM: state.month, startY: state.year
+    });
+    
+    state.transactions.unshift({ m: state.month, y: state.year, desc: 'Čerpání spotřebitelského úvěru', amt: amt, acc: 'bank' });
+    updateAll(); closeModal(); intB1();
+};
+        // ============================================================
+        //  DLUHOPISY – Národní Banka  |  drop-in náhrada za intB2
+        //  Závislosti: state, logTx, updateAll, showModal, closeModal
+        // ============================================================
+
+        const _nb = {
+          fmt: (n) => (n || 0).toLocaleString('cs-CZ'),
+
+          addMonths: (m, y, n) => ({
+            month: ((m + n - 1) % 12) + 1,
+            year:  y + Math.floor((m + n - 1) / 12),
+          }),
+
+          fmtDate: (m, y) => `${String(m).padStart(2,'0')}.${y}`,
+
+          calcFinal: (amount, key) => {
+            const t = _nb.BONDS[key];
+            return Math.round(amount * (1 + t.rateAnnual * t.tenorM / 12));
+          },
+
+          bondStatus: (b) => {
+            const nowT = state.year * 12 + state.month;
+            const dueT = b.uY  * 12 + b.uM;
+            if (nowT >= dueT) return 'matured';
+            return b.earlyRedeem ? 'active' : 'locked';
+          },
+
+          BONDS: {
+            fixed5: {
+              key: 'fixed5',
+              isin: 'CZ0001007686',
+              name: 'Fixní státní dluhopis ČR',
+              short: 'Fixní dluhopis · 5 let',
+              tenorM: 60,
+              rateAnnual: 0.05,
+              minAmt: 1000,
+              step:   1000,
+              earlyRedeem: true,
+              penalty: 0.02,
+            },
+            tbill3: {
+              key: 'tbill3',
+              isin: 'CZ0001007702',
+              name: 'Státní pokladniční poukázka ČR',
+              short: 'Pokladniční poukázka · 3 měs.',
+              tenorM: 3,
+              rateAnnual: 0.032,
+              minAmt: 1000,
+              step:   1000,
+              earlyRedeem: false,
+              penalty: 0,
+            },
+          },
+        };
+
+        // ── Pomocné globální funkce ───────────────────────────────────
+
+        window.updateBondPreview = (key) => {
+          const t   = _nb.BONDS[key];
+          const inp = document.getElementById('bondAmt_' + key);
+          if (!inp) return;
+          const amt   = Math.floor(Number(inp.value)) || 0;
+          const final = _nb.calcFinal(amt, key);
+          const yld   = final - amt;
+
+          const previewEl = document.getElementById('bondPreview_' + key);
+          const finalEl   = document.getElementById('bondFinal_'   + key);
+          const warnEl    = document.getElementById('bondWarn_'    + key);
+
+          if (previewEl && finalEl) {
+            if (amt >= t.minAmt) {
+              previewEl.classList.remove('hidden');
+              finalEl.textContent = _nb.fmt(final) + ' Kč  (+' + _nb.fmt(yld) + ')';
+            } else {
+              previewEl.classList.add('hidden');
+            }
+          }
+          if (warnEl) {
+            if (amt > (state.cash || 0))
+              warnEl.textContent = `Nedostatek hotovosti (máte ${_nb.fmt(state.cash)} Kč)`;
+            else if (amt < t.minAmt)
+              warnEl.textContent = `Min. investice je ${_nb.fmt(t.minAmt)} Kč`;
+            else if (amt % t.step !== 0)
+              warnEl.textContent = `Částka musí být násobkem ${_nb.fmt(t.step)} Kč`;
+            else
+              warnEl.textContent = '';
+          }
+        };
+
+        window.handleBondBuy = (key) => {
+          const t   = _nb.BONDS[key];
+          const inp = document.getElementById('bondAmt_' + key);
+          if (!inp) return;
+          const amount = Math.floor(Number(inp.value));
+
+          if (!amount || amount < t.minAmt)   return alert(`Min. investice je ${_nb.fmt(t.minAmt)} Kč.`);
+          if (amount % t.step !== 0)          return alert(`Částka musí být násobkem ${_nb.fmt(t.step)} Kč.`);
+          if (amount > (state.cash || 0))     return alert(`Nedostatek hotovosti. V peněžence máte ${_nb.fmt(state.cash)} Kč.`);
+
+          const due   = _nb.addMonths(state.month, state.year, t.tenorM);
+          const final = _nb.calcFinal(amount, key);
+          const id    = 'DLH-' + Date.now().toString(36).toUpperCase();
+
+          logTx('Nákup dluhopisu ' + t.short, -amount);
+          state.bonds = state.bonds || [];
+          state.bonds.push({
+            id, typeKey: key, amount, finalValue: final,
+            uM: due.month, uY: due.year,
+            purchasedM: state.month, purchasedY: state.year,
+            earlyRedeem: t.earlyRedeem, penaltyPct: t.penalty,
+          });
+
+          updateAll(); closeModal();
+          alert(`✅ Nakoupeno!\n${t.name}\nInvestováno: ${_nb.fmt(amount)} Kč\nSplatnost: ${_nb.fmtDate(due.month, due.year)}\nObdržíte: ${_nb.fmt(final)} Kč`);
+          intB2();
+        };
+
+        window.showBondContract = (idx) => {
+          const b   = state.bonds[idx];
+          const t   = _nb.BONDS[b.typeKey] || {};
+          const fmt = _nb.fmt;
+          const status = _nb.bondStatus(b);
+          const yld    = b.finalValue - b.amount;
+          const yldPct = ((yld / b.amount) * 100).toFixed(2);
+
+          const statusRow = status === 'matured'
+            ? `<div class="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold p-3 rounded text-center">✅ Dluhopis je splatný – výnos připraven k výplatě</div>`
+            : status === 'locked'
+            ? `<div class="bg-indigo-50 border border-indigo-200 text-indigo-800 text-xs font-bold p-3 rounded text-center">🔒 Uzamčeno do ${_nb.fmtDate(b.uM, b.uY)} – předčasné splacení není povoleno</div>`
+            : `<div class="bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold p-3 rounded text-center">🔓 Aktivní · Splatnost ${_nb.fmtDate(b.uM, b.uY)} · Předčasné splacení s penálem ${(b.penaltyPct*100).toFixed(0)} %</div>`;
+
+          const earlyBtn = (status === 'active')
+            ? `<button onclick="handleBondEarlyRedeem(${idx})"
+                 class="w-full bg-red-100 hover:bg-red-200 text-red-700 border border-red-300 py-2 rounded font-bold text-xs transition">
+                 Předčasně splatit (penál ${(b.penaltyPct*100).toFixed(0)} % = −${fmt(Math.round(b.amount*b.penaltyPct))} Kč)
+               </button>` : '';
+
+          const matureBtn = (status === 'matured')
+            ? `<button onclick="handleBondMature(${idx})"
+                 class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded font-bold text-sm transition">
+                 💰 Přijmout výplatu ${fmt(b.finalValue)} Kč
+               </button>` : '';
+
+          const content = `
+            <div class="text-center mb-6 border-b pb-4">
+              <div class="text-[10px] font-mono text-slate-400 tracking-widest mb-1">${t.isin || '—'} · ${b.id}</div>
+              <h2 class="text-xl font-black uppercase tracking-widest text-slate-900">Dluhopis</h2>
+              <p class="text-sm text-slate-500 mt-0.5">${t.name || 'Státní cenný papír'}</p>
+            </div>
+            <div class="text-center mb-5">
+              <div class="text-xs text-slate-400 uppercase tracking-wider">Jmenovitá hodnota</div>
+              <div class="text-4xl font-black text-slate-900 mt-1">${fmt(b.amount)} Kč</div>
+              <div class="text-sm text-emerald-600 font-bold mt-1">Výnos při splatnosti: +${fmt(yld)} Kč (+${yldPct} %)</div>
+            </div>
+            <div class="bg-slate-50 p-4 rounded border border-slate-200 my-4">
+              <ul class="list-disc pl-5 space-y-1 text-sm">
+                <li><b>Typ cenného papíru:</b> ${t.name || '—'}</li>
+                <li><b>Úroková sazba:</b> ${(t.rateAnnual || 0)*100} % p.a. (pevná)</li>
+                <li><b>Reinvestice výnosu:</b> ANO</li>
+                <li><b>Výplata výnosu:</b> jednorázově při splatnosti</li>
+                <li><b>Předčasné splacení:</b> ${b.earlyRedeem ? 'ANO – penál ' + (b.penaltyPct*100).toFixed(0) + ' %' : 'NE'}</li>
+                <li><b>Datum nákupu:</b> ${_nb.fmtDate(b.purchasedM, b.purchasedY)}</li>
+                <li><b>Datum splatnosti:</b> ${_nb.fmtDate(b.uM, b.uY)}</li>
+                <li><b>Celkem obdržíte:</b> ${fmt(b.finalValue)} Kč</li>
+              </ul>
+            </div>
+            <div class="space-y-2">
+              ${statusRow}
+              ${earlyBtn}
+              ${matureBtn}
+            </div>
+            <div class="grid grid-cols-2 mt-8 pt-6 border-t text-center text-sm">
+              <div>
+                <div class="border-b border-slate-400 w-3/4 mx-auto mb-2"></div>
+                <span class="text-xs text-slate-500">Podpis Emitenta (ČR – MF)</span>
+              </div>
+              <div>
+                <div class="border-b border-slate-400 w-3/4 mx-auto mb-2 font-black font-serif italic text-indigo-800 text-lg">Podepsáno elektronicky</div>
+                <span class="text-xs text-slate-500">Podpis Věřitele</span>
+              </div>
+            </div>
+          `;
+
+          const contentDiv = document.getElementById('bondContractContent');
+          const overlayDiv = document.getElementById('bondContractOverlay');
+          if (contentDiv && overlayDiv) {
+            contentDiv.innerHTML = content;
+            overlayDiv.style.display = 'flex';
+          }
+        };
+
+        window.showBondInfo = () => {
+          const ov = document.getElementById('bondInfoOverlay');
+          if (ov) ov.style.display = 'flex';
+        };
+
+        window.handleBondEarlyRedeem = (idx) => {
+          const b       = state.bonds[idx];
+          const penalty = Math.round(b.amount * b.penaltyPct);
+          const payout  = b.amount - penalty;
+          if (!confirm(`Předčasné splacení\nObdržíte: ${_nb.fmt(payout)} Kč\nPenál: −${_nb.fmt(penalty)} Kč\n\nPotvrdit?`)) return;
+          logTx('Předčasné splacení dluhopisu', payout);
+          state.bonds.splice(idx, 1);
+          updateAll(); closeModal(); intB2();
+        };
+
+        window.handleBondMature = (idx) => {
+          const b = state.bonds[idx];
+          logTx('Výplata dluhopisu při splatnosti', b.finalValue);
+          state.bonds.splice(idx, 1);
+          updateAll(); closeModal();
+          alert(`💰 Výplata provedena!\nPřipsáno: ${_nb.fmt(b.finalValue)} Kč`);
+          intB2();
+        };
+
+        // ── Hlavní funkce ─────────────────────────────────────────────
+
+        window.intB2 = () => {
+          try {
+            state.bonds = state.bonds || [];
+            const fmt = _nb.fmt;
+
+            // ── Portfolio dluhopisů ──
+            const bondsHtml = state.bonds.length > 0
+              ? state.bonds.map((b, i) => {
+                  const t      = _nb.BONDS[b.typeKey] || {};
+                  const status = _nb.bondStatus(b);
+                  const dot    = status === 'matured' ? 'bg-amber-400' : status === 'locked' ? 'bg-sky-400' : 'bg-emerald-400';
+                  const label  = status === 'matured' ? 'Splatné'      : status === 'locked' ? 'Uzamčeno'   : 'Aktivní';
+                  const labelC = status === 'matured' ? 'text-amber-300' : status === 'locked' ? 'text-sky-300' : 'text-emerald-300';
+                  return `
+                    <div class="rounded-xl border border-indigo-700/60 bg-indigo-800/40 px-4 py-3 mb-2 flex justify-between items-center gap-3 hover:bg-indigo-800/70 transition cursor-pointer"
+                         onclick="showBondContract(${i})">
+                      <div class="flex items-center gap-2 min-w-0">
+                        <div class="w-2 h-2 rounded-full ${dot} shrink-0"></div>
+                        <div class="min-w-0">
+                          <div class="text-[10px] text-indigo-300 uppercase truncate">${t.short || 'Dluhopis'}</div>
+                          <div class="font-bold text-white text-sm">${fmt(b.amount)} Kč</div>
+                          <div class="text-[10px] ${labelC}">${label} · spl. ${_nb.fmtDate(b.uM, b.uY)}</div>
+                        </div>
+                      </div>
+                      <div class="text-right shrink-0">
+                        <div class="text-[10px] text-indigo-400">při splatnosti</div>
+                        <div class="font-black text-amber-400 text-sm">${fmt(b.finalValue)} Kč</div>
+                        <div class="text-[10px] text-indigo-400 mt-0.5">Smlouva →</div>
+                      </div>
+                    </div>`;
+                }).join('')
+              : `<div class="text-center py-10 text-indigo-400 text-sm">
+                   <div class="text-3xl mb-2 opacity-40">📋</div>
+                   Žádné aktivní dluhopisy.<br>Vyberte produkt z nabídky.
+                 </div>`;
+
+            // ── Resize okna ──
+            const modalContent = document.getElementById('game-modal-content');
+            if (modalContent) modalContent.className = 'bg-slate-50 rounded-3xl p-6 max-w-6xl w-full shadow-2xl border border-slate-200 relative';
+
+            showModal(
+              "Národní Banka | Dluhopisy",
+              "", "Zavřít", null,
+              `
+              <!-- Contract overlay -->
+              <div id="bondContractOverlay"
+                class="absolute inset-0 bg-indigo-950/95 z-50 hidden flex-col items-center justify-center p-8 rounded-3xl backdrop-blur-sm">
+                <div class="bg-white p-8 rounded-2xl max-w-2xl w-full shadow-2xl relative overflow-y-auto max-h-[80vh]">
+                  <button onclick="document.getElementById('bondContractOverlay').style.display='none'"
+                    class="absolute top-4 right-4 text-slate-400 hover:text-red-600 font-bold text-xl">×</button>
+                  <div id="bondContractContent" class="text-sm text-slate-700 space-y-4"></div>
+                </div>
+              </div>
+
+              <!-- Info overlay -->
+              <div id="bondInfoOverlay"
+                class="absolute inset-0 bg-indigo-950/95 z-50 hidden flex-col items-center justify-center p-8 rounded-3xl backdrop-blur-sm">
+                <div class="bg-white p-8 rounded-2xl max-w-2xl w-full shadow-2xl relative overflow-y-auto max-h-[80vh]">
+                  <button onclick="document.getElementById('bondInfoOverlay').style.display='none'"
+                    class="absolute top-4 right-4 text-slate-400 hover:text-red-600 font-bold text-xl">×</button>
+                  <div class="text-center border-b pb-4 mb-5">
+                    <div class="text-[10px] text-slate-400 uppercase tracking-widest mb-1">Vzdělávací sekce</div>
+                    <h2 class="text-xl font-black uppercase tracking-widest text-slate-900">ČNB a státní dluhopisy</h2>
+                  </div>
+                  <div class="space-y-4 text-sm text-slate-700 leading-relaxed">
+                    <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+                      <div class="font-bold text-indigo-900 mb-1">🏛️ Kdo dluhopisy vydává?</div>
+                      <p>Státní dluhopisy <b>nevydává ČNB, ale Ministerstvo financí ČR (MF)</b>. MF tak financuje schodek státního rozpočtu — stát si od vás půjčuje peníze a zavazuje se je vrátit i s úrokem.</p>
+                    </div>
+                    <div class="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                      <div class="font-bold text-slate-900 mb-1">🤝 Jakou roli hraje ČNB?</div>
+                      <p>ČNB vystupuje jako <b>fiskální agent a platební agent státu</b>. Prakticky to znamená, že zajišťuje <b>aukce dluhopisů</b> (prodej primárním dealerům — velkým bankám), vede <b>Centrální registr cenných papírů</b>, provádí výplaty úroků a jistiny při splatnosti a zúčtovává transakce. MF rozhoduje <em>co</em> se vydá, ČNB zařídí <em>jak</em> se to technicky provede.</p>
+                    </div>
+                    <div class="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                      <div class="font-bold text-slate-900 mb-1">📋 Co ještě ČNB dělá?</div>
+                      <ul class="list-disc pl-5 space-y-1 mt-1">
+                        <li><b>Měnová politika</b> — stanovuje základní úrokovou sazbu (2T repo sazbu), čímž ovlivňuje inflaci i cenu hypoték</li>
+                        <li><b>Dohled nad finančním trhem</b> — banky, pojišťovny, penzijní fondy, kapitálový trh</li>
+                        <li><b>Správa devizových rezerv</b> — ČR drží zásoby cizích měn a zlata</li>
+                        <li><b>Emise hotovosti</b> — jediná instituce oprávněná vydávat bankovky a mince v ČR</li>
+                        <li><b>Systémová stabilita</b> — hlídá rizika pro celý finanční systém</li>
+                      </ul>
+                    </div>
+                    <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 flex gap-4 items-start">
+                      <div class="text-4xl">👤</div>
+                      <div>
+                        <div class="font-bold text-amber-900">Guvernér ČNB: Aleš Michl</div>
+                        <p class="mt-1 text-slate-600">Ve funkci od <b>1. července 2022</b>, jmenován prezidentem Milošem Zemanem. Před nástupem do ČNB působil jako člen bankovní rady a analytik. Je znám důrazem na boj s inflací — bankovní rada pod jeho vedením výrazně zvyšovala úrokové sazby v letech 2022–2023. Mandát guvernéra trvá 6 let.</p>
+                      </div>
+                    </div>
+                    <div class="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                      <div class="font-bold text-slate-900 mb-1">💡 Proč je to důležité pro investora?</div>
+                      <p>Výnosy státních dluhopisů jsou úzce propojeny s tím, co ČNB dělá s úrokovými sazbami. Když ČNB sazby zvyšuje (drahé peníze), nové dluhopisy nabízejí vyšší úrok — a naopak. Sledujte tedy nejen MF, ale i rozhodnutí bankovní rady ČNB.</p>
+                    </div>
+                  </div>
+                  <button onclick="document.getElementById('bondInfoOverlay').style.display='none'"
+                    class="w-full mt-6 bg-indigo-800 hover:bg-indigo-900 text-white py-2 rounded-xl font-bold text-sm transition">Zavřít</button>
+                </div>
+              </div>
+
+              <!-- Hlavní grid -->
+              <div class="grid grid-cols-12 gap-0 w-full rounded-2xl overflow-hidden" style="font-family: sans-serif; min-height: 520px;">
+
+                <!-- LEVÝ SLOUPEC: Portfolio (tmavý indigo panel) -->
+                <div class="col-span-4 bg-indigo-950 text-white flex flex-col p-5 gap-3">
+
+                  <!-- Hlavička portfolia -->
+                  <div class="flex items-center justify-between border-b border-indigo-800 pb-3 mb-1">
+                    <div>
+                      <div class="text-[10px] text-indigo-400 uppercase tracking-widest">Národní banka</div>
+                      <div class="text-sm font-black text-white tracking-wide">Moje dluhopisy</div>
+                    </div>
+                    <button onclick="showBondInfo()"
+                      class="w-6 h-6 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-900 text-[11px] font-black flex items-center justify-center transition shrink-0"
+                      title="Co je ČNB a jak souvisí s dluhopisy?">i</button>
+                  </div>
+
+                  <!-- Celková hodnota -->
+                  ${state.bonds.length > 0 ? `
+                  <div class="bg-indigo-900/50 rounded-xl px-4 py-3 border border-indigo-800/60">
+                    <div class="text-[10px] text-indigo-400 uppercase tracking-wider">Celkem investováno</div>
+                    <div class="text-2xl font-black text-white mt-0.5">
+                      ${fmt(state.bonds.reduce((s,b) => s + b.amount, 0))} Kč
+                    </div>
+                    <div class="text-[11px] text-amber-400 mt-0.5">
+                      → ${fmt(state.bonds.reduce((s,b) => s + b.finalValue, 0))} Kč při splatnosti
+                    </div>
+                  </div>` : ''}
+
+                  <!-- Seznam dluhopisů -->
+                  <div class="flex-1 overflow-y-auto pr-0.5 -mr-1">
+                    ${bondsHtml}
+                  </div>
+                </div>
+
+                <!-- PRAVÝ SLOUPEC: Nabídka (světlé karty) -->
+                <div class="col-span-8 bg-slate-100 flex flex-col gap-4 p-5">
+
+                  <div class="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1">
+                    Aktuální nabídka státních dluhopisů · Emisní den 15.07.2026
+                  </div>
+
+                  <!-- Karta: Fixní dluhopis 5Y -->
+                  <div class="bg-white rounded-2xl shadow-sm overflow-hidden border border-slate-200">
+                    <div class="bg-indigo-900 px-5 py-4 flex justify-between items-start">
+                      <div>
+                        <div class="text-[9px] font-mono text-indigo-300 tracking-widest">ISIN: CZ0001007686</div>
+                        <div class="text-white font-bold text-sm mt-0.5">Fixní státní dluhopis ČR</div>
+                        <div class="text-[10px] text-indigo-300 mt-0.5">Splatnost 5 let · Penál 2 % za předčasné splacení</div>
+                      </div>
+                      <div class="text-right">
+                        <div class="text-3xl font-black text-amber-400 leading-none">5,00 %</div>
+                        <div class="text-[10px] text-indigo-300 mt-0.5">p.a. · celkem +25 %</div>
+                      </div>
+                    </div>
+                    <div class="px-5 py-4">
+                      <div class="grid grid-cols-3 gap-3 text-[11px] text-slate-500 mb-4">
+                        <div><div class="font-bold text-slate-800 text-sm">Pevná</div>Typ úročení</div>
+                        <div><div class="font-bold text-slate-800 text-sm">Při splatnosti</div>Výplata výnosu</div>
+                        <div><div class="font-bold text-slate-800 text-sm">Nízké</div>Riziko</div>
+                      </div>
+                      <div class="flex gap-3 items-end">
+                        <div class="flex-1">
+                          <label class="text-[10px] text-slate-500 font-bold block mb-1">Investovaná částka (Kč, min. 1 000)</label>
+                          <input id="bondAmt_fixed5" type="number" min="1000" step="1000" value="1000"
+                            oninput="updateBondPreview('fixed5')"
+                            class="w-full border border-slate-200 bg-slate-50 p-2 rounded-lg text-sm focus:border-indigo-400 focus:bg-white outline-none transition">
+                          <div id="bondWarn_fixed5" class="text-[10px] text-red-500 mt-1"></div>
+                        </div>
+                        <div id="bondPreview_fixed5" class="text-right hidden shrink-0">
+                          <div class="text-[10px] text-slate-400">Obdržíte</div>
+                          <div id="bondFinal_fixed5" class="font-black text-emerald-600 text-xs whitespace-nowrap">—</div>
+                        </div>
+                        <button onclick="handleBondBuy('fixed5')"
+                          class="bg-indigo-800 hover:bg-indigo-900 text-white px-5 py-2 rounded-lg font-bold text-xs transition shrink-0">
+                          Koupit →
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Karta: Pokladniční poukázka 3M -->
+                  <div class="bg-white rounded-2xl shadow-sm overflow-hidden border border-slate-200">
+                    <div class="bg-teal-800 px-5 py-4 flex justify-between items-start">
+                      <div>
+                        <div class="text-[9px] font-mono text-teal-300 tracking-widest">ISIN: CZ0001007702</div>
+                        <div class="text-white font-bold text-sm mt-0.5">Státní pokladniční poukázka ČR</div>
+                        <div class="text-[10px] text-teal-300 mt-0.5">Splatnost 3 měsíce · Předčasné splacení NENÍ možné</div>
+                      </div>
+                      <div class="text-right">
+                        <div class="text-3xl font-black text-amber-400 leading-none">3,20 %</div>
+                        <div class="text-[10px] text-teal-300 mt-0.5">p.a. · +0,80 % za 3 měs.</div>
+                      </div>
+                    </div>
+                    <div class="px-5 py-4">
+                      <div class="grid grid-cols-3 gap-3 text-[11px] text-slate-500 mb-4">
+                        <div><div class="font-bold text-slate-800 text-sm">Pevná</div>Typ úročení</div>
+                        <div><div class="font-bold text-slate-800 text-sm">Při splatnosti</div>Výplata výnosu</div>
+                        <div><div class="font-bold text-slate-800 text-sm">Velmi nízké</div>Riziko</div>
+                      </div>
+                      <div class="flex gap-3 items-end">
+                        <div class="flex-1">
+                          <label class="text-[10px] text-slate-500 font-bold block mb-1">Investovaná částka (Kč, min. 1 000)</label>
+                          <input id="bondAmt_tbill3" type="number" min="1000" step="1000" value="1000"
+                            oninput="updateBondPreview('tbill3')"
+                            class="w-full border border-slate-200 bg-slate-50 p-2 rounded-lg text-sm focus:border-teal-400 focus:bg-white outline-none transition">
+                          <div id="bondWarn_tbill3" class="text-[10px] text-red-500 mt-1"></div>
+                        </div>
+                        <div id="bondPreview_tbill3" class="text-right hidden shrink-0">
+                          <div class="text-[10px] text-slate-400">Obdržíte</div>
+                          <div id="bondFinal_tbill3" class="font-black text-emerald-600 text-xs whitespace-nowrap">—</div>
+                        </div>
+                        <button onclick="handleBondBuy('tbill3')"
+                          class="bg-teal-700 hover:bg-teal-800 text-white px-5 py-2 rounded-lg font-bold text-xs transition shrink-0">
+                          Koupit →
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="text-[10px] text-slate-400 text-center leading-relaxed">
+                    Garantováno Českou republikou dle zák. č. 190/2004 Sb. · Min. investice 1 000 Kč · Násobky 1 000 Kč
+                  </div>
+
+                </div>
+              </div>
+              `
+            );
+
+          } catch (error) {
+            alert('Chyba při načítání dluhopisů: ' + error.message);
+            console.error(error);
+          }
+        };
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// === BURZA - GLOBÁLNÍ DATA A STAV ===
+window.marketInstruments = [
+    { id: "fund_cons", type: "fund", name: "Konzervativní fond", risk: "Nízké", desc: "Zaměřeno na státní a kvalitní korporátní dluhopisy.", comp: "70% Státní dluhopisy, 30% Korporátní", basePrice: 100, trend: 0.002, vol: 0.01 },
+    { id: "fund_bal", type: "fund", name: "Vyvážený fond", risk: "Střední", desc: "Kombinace akcií a dluhopisů pro stabilní růst.", comp: "50% Akcie, 50% Dluhopisy", basePrice: 120, trend: 0.004, vol: 0.02 },
+    { id: "fund_dyn", type: "fund", name: "Dynamický fond", risk: "Vysoké", desc: "Růstový fond zaměřený převážně na akcie.", comp: "90% Akcie, 10% Hotovost", basePrice: 150, trend: 0.006, vol: 0.035 },
+    { id: "stock_tech", type: "stock", name: "NovaTech", risk: "Vysoké", desc: "Vývoj cloudových a AI řešení.", comp: "Software, Cloud", basePrice: 200, trend: 0.008, vol: 0.05 },
+    { id: "stock_energy", type: "stock", name: "Aura Energy", risk: "Střední", desc: "Evropský lídr v obnovitelných zdrojích.", comp: "Solární a větrná energie", basePrice: 80, trend: 0.003, vol: 0.025 },
+    { id: "stock_agro", type: "stock", name: "AgroGlobal", risk: "Nízké", desc: "Mezinárodní zemědělský holding.", comp: "Plodiny, Logistika", basePrice: 60, trend: 0.002, vol: 0.015 },
+    { id: "stock_health", type: "stock", name: "Medica Health", risk: "Střední", desc: "Provozovatel sítě soukromých klinik.", comp: "Zdravotnictví, Diagnostika", basePrice: 140, trend: 0.004, vol: 0.02 },
+    { id: "stock_auto", type: "stock", name: "VoltMotors", risk: "Vysoké", desc: "Výrobce prémiových elektromobilů.", comp: "Automobily, Baterie", basePrice: 300, trend: 0.005, vol: 0.06 }
+];
+
+window.marketState = {
+    initialized: false,
+    selectedId: "fund_bal",
+    history: {},      // id -> [{month: int, price: float}]
+    news: {},         // id -> [{date: str, text: str}]
+    portfolio: {},    // id -> {amount: float, invested: float}
+    trades: []        // {id, name, type, qty, price, date}
+};
+
+window.marketCharts = {}; // Globální úložiště instancí grafů (brání překrývání)
+
+// === INICIALIZACE A GENERÁTOR TRHU ===
+window.initMarketSystem = () => {
+    if (window.marketState.initialized) return;
+    
+    window.marketInstruments.forEach(instr => {
+        const hist = [];
+        const news = [];
+        let price = instr.basePrice;
+        
+        // Vygenerování 12 měsíců historie zpětně
+        for (let i = -11; i <= 0; i++) {
+            const noise = (Math.random() - 0.5) * instr.vol;
+            price = Math.max(5, price * (1 + instr.trend + noise));
+            hist.push({ month: i, price: Math.round(price * 100) / 100 });
+            
+            // Generování zpráv
+            if (i < 0) {
+                const change = noise > 0 ? "Růst" : "Pokles";
+                const hint = noise > 0 ? "Očekáváme stabilitu." : "Management chystá změny.";
+                news.unshift({ date: `Měsíc ${i}`, text: `${change} tržní hodnoty. ${hint}` });
+            }
+        }
+        window.marketState.history[instr.id] = hist;
+        window.marketState.news[instr.id] = news;
+        window.marketState.portfolio[instr.id] = { amount: 0, invested: 0 };
+    });
+    window.marketState.initialized = true;
+};
+
+// Funkce, kterou zavoláš, když se ve hře posune měsíc (vygeneruje novou cenu a zprávu)
+window.advanceMarketMonth = (currentGameMonth) => {
+    window.marketInstruments.forEach(instr => {
+        const hist = window.marketState.history[instr.id];
+        const lastPrice = hist[hist.length - 1].price;
+        
+        const noise = (Math.random() - 0.5) * instr.vol;
+        const newPrice = Math.max(5, lastPrice * (1 + instr.trend + noise));
+        hist.push({ month: currentGameMonth, price: Math.round(newPrice * 100) / 100 });
+        
+        // Generování logické zprávy k vývoji
+        let newsText = "";
+        if (noise > instr.vol * 0.3) newsText = "Silný kvartál, ohlášeny nové vládní dotace a investice.";
+        else if (noise < -instr.vol * 0.3) newsText = "Problémy v dodavatelském řetězci stáhly cenu dolů. Budoucnost je nejistá.";
+        else newsText = "Stabilní vývoj podle očekávání, bez větších překvapení na trhu.";
+        
+        window.marketState.news[instr.id].unshift({ date: `Měsíc ${currentGameMonth}`, text: newsText });
+    });
+};
+
+// === HLAVNÍ OTEVŘENÍ OKNA ===
+window.intEx = () => {
+    window.initMarketSystem();
+    
+    const oldModal = document.getElementById('exchange-overlay');
+    if (oldModal) oldModal.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'exchange-overlay';
+    overlay.className = 'fixed inset-0 bg-slate-900/90 z-[100] flex justify-center items-center p-8 backdrop-blur-md';
+    overlay.innerHTML = `
+        <div class="bg-slate-50 w-full max-w-[1400px] h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-700">
+            <div class="bg-slate-900 px-6 py-4 flex justify-between items-center border-b border-slate-800 shadow-sm z-10 text-white">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-white text-xl">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-black tracking-tight">FinBroker Pro</h2>
+                        <div class="text-[11px] text-emerald-400 font-medium uppercase tracking-wider">Profesionální obchodní platforma</div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-6">
+                    <div class="text-right">
+                        <div class="text-[10px] text-slate-400 uppercase font-bold">K dispozici k investování</div>
+                        <div class="text-xl font-black text-white" id="ex-cash-display">${window.fmt(state.cash || state.money || 0)} Kč</div>
+                    </div>
+                    <button onclick="document.getElementById('exchange-overlay').remove()" class="bg-slate-700 hover:bg-slate-600 px-6 py-2 rounded-lg font-bold transition">
+                        Zavřít platformu
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex-1 flex overflow-hidden">
+                <div class="w-64 bg-slate-900 flex flex-col z-0 shadow-lg text-slate-300 text-sm font-bold">
+                    <button onclick="window.setExTab('obchod')" id="tab-obchod" class="w-full text-left px-6 py-4 hover:bg-slate-800 border-l-4 border-emerald-500 text-white transition"><i class="fas fa-search-dollar w-6"></i> Trhy & Obchod</button>
+                    <button onclick="window.setExTab('portfolio')" id="tab-portfolio" class="w-full text-left px-6 py-4 hover:bg-slate-800 border-l-4 border-transparent transition"><i class="fas fa-pie-chart w-6"></i> Moje Portfolio</button>
+                    <button onclick="window.setExTab('historie')" id="tab-historie" class="w-full text-left px-6 py-4 hover:bg-slate-800 border-l-4 border-transparent transition"><i class="fas fa-history w-6"></i> Historie obchodů</button>
+                </div>
+
+                <div id="ex-content" class="flex-1 overflow-hidden bg-slate-100 relative"></div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    window.setExTab('obchod');
+};
+
+window.setExTab = (tab) => {
+    ['obchod', 'portfolio', 'historie'].forEach(t => {
+        const btn = document.getElementById(`tab-${t}`);
+        if(t === tab) {
+            btn.classList.add('border-emerald-500', 'text-white', 'bg-slate-800');
+            btn.classList.remove('border-transparent', 'bg-transparent');
+        } else {
+            btn.classList.add('border-transparent');
+            btn.classList.remove('border-emerald-500', 'text-white', 'bg-slate-800');
+        }
+    });
+
+    const content = document.getElementById('ex-content');
+    if (tab === 'obchod') {
+        content.innerHTML = `
+            <div class="flex h-full">
+                <div class="w-80 bg-white border-r border-slate-200 flex flex-col">
+                    <div class="px-4 py-3 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-widest">Dostupná aktiva</div>
+                    <div id="ex-market-list" class="flex-1 overflow-y-auto p-2 space-y-1"></div>
+                </div>
+                <div id="ex-trade-detail" class="flex-1 overflow-y-auto p-6"></div>
+            </div>
+        `;
+        window.renderMarketList();
+        window.renderTradeDetail();
+    } else if (tab === 'portfolio') {
+        window.renderPortfolio();
+    } else {
+        window.renderHistory();
+    }
+};
+
+// === 1. ZÁLOŽKA: TRHY A OBCHOD ===
+window.renderMarketList = () => {
+    document.getElementById("ex-market-list").innerHTML = window.marketInstruments.map(instr => {
+        const hist = window.marketState.history[instr.id];
+        const currentPrice = hist[hist.length - 1].price;
+        const prevPrice = hist[hist.length - 2].price;
+        const pct = ((currentPrice - prevPrice) / prevPrice) * 100;
+        const isUp = pct >= 0;
+        const isSelected = window.marketState.selectedId === instr.id;
+
+        return `
+            <button onclick="window.marketState.selectedId='${instr.id}'; window.renderTradeDetail(); window.renderMarketList();" 
+                    class="w-full text-left px-3 py-3 rounded-lg transition border ${isSelected ? 'bg-white border-emerald-500 shadow-md' : 'bg-transparent border-transparent hover:bg-slate-100'}">
+                <div class="flex justify-between items-center mb-1">
+                    <span class="font-bold text-sm text-slate-800">${instr.name}</span>
+                    <span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${instr.type==='fund'?'bg-purple-100 text-purple-700':'bg-blue-100 text-blue-700'}">${instr.type==='fund'?'Fond':'Akcie'}</span>
+                </div>
+                <div class="flex justify-between items-end mt-2">
+                    <div class="text-lg font-black text-slate-800">${window.fmt(currentPrice)} <span class="text-xs text-slate-500 font-normal">Kč</span></div>
+                    <div class="text-[11px] font-bold ${isUp ? 'text-emerald-500' : 'text-red-500'} bg-${isUp ? 'emerald' : 'red'}-50 px-2 py-0.5 rounded">
+                        ${isUp ? '+' : ''}${pct.toFixed(2)} %
+                    </div>
+                </div>
+            </button>
+        `;
+    }).join("");
+};
+
+window.renderTradeDetail = () => {
+    const el = document.getElementById("ex-trade-detail");
+    if(!el) return;
+    
+    const instr = window.marketInstruments.find(i => i.id === window.marketState.selectedId);
+    const hist = window.marketState.history[instr.id];
+    const currentPrice = hist[hist.length - 1].price;
+    const pos = window.marketState.portfolio[instr.id];
+    const news = window.marketState.news[instr.id];
+
+    el.innerHTML = `
+        <div class="grid grid-cols-3 gap-6 h-full">
+            <div class="col-span-2 flex flex-col gap-6">
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="flex justify-between items-start mb-6">
+                        <div>
+                            <h3 class="text-3xl font-black text-slate-800">${instr.name}</h3>
+                            <p class="text-sm text-slate-500 mt-1">${instr.desc}</p>
+                            <div class="mt-2 text-xs text-slate-400"><strong>Složení:</strong> ${instr.comp} | <strong>Riziko:</strong> ${instr.risk}</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-4xl font-mono font-black text-slate-800">${window.fmt(currentPrice)} Kč</div>
+                        </div>
+                    </div>
+                    <div class="w-full h-80 relative">
+                        <canvas id="interactive-chart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex-1 flex flex-col min-h-0">
+                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4"><i class="far fa-newspaper"></i> Zpravodajství a fundamenty</h4>
+                    <div class="overflow-y-auto space-y-3 flex-1 pr-2">
+                        ${news.map(n => `
+                            <div class="border-l-2 border-emerald-400 pl-3 py-1">
+                                <div class="text-[10px] font-bold text-slate-400">${n.date}</div>
+                                <div class="text-sm text-slate-700">${n.text}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-span-1 flex flex-col gap-6">
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Investiční pokyn</h4>
+                    
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 mb-6">
+                        <div class="flex justify-between text-xs mb-2">
+                            <span class="text-slate-500">Otevřená pozice:</span>
+                            <span class="font-bold text-slate-800">${pos.amount.toFixed(2)} ks</span>
+                        </div>
+                        <div class="flex justify-between text-xs">
+                            <span class="text-slate-500">Aktuální hodnota:</span>
+                            <span class="font-bold text-blue-600">${window.fmt(pos.amount * currentPrice)} Kč</span>
+                        </div>
+                    </div>
+
+                    <div class="mb-6">
+                        <label class="text-xs font-bold text-slate-700 mb-2 block">Zadejte počet kusů (i zlomkové)</label>
+                        <input type="number" id="trade-qty" min="0.01" step="0.01" value="1" oninput="window.updateTradePreview(${currentPrice})" class="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-xl font-black text-slate-800 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition text-center shadow-inner">
+                        <div class="text-center text-xs text-slate-500 mt-2">
+                            Celková částka obchodu: <b id="trade-preview" class="text-slate-800">${window.fmt(currentPrice)} Kč</b>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="window.executeTrade('buy')" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 rounded-xl transition shadow-lg shadow-emerald-200">
+                            KOUPIT
+                        </button>
+                        <button onclick="window.executeTrade('sell')" class="bg-red-500 hover:bg-red-600 text-white font-bold py-4 rounded-xl transition shadow-lg shadow-red-200">
+                            PRODAT
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Vykreslení interaktivního grafu přes Chart.js
+    const ctx = document.getElementById('interactive-chart').getContext('2d');
+    if (window.marketCharts['detail']) window.marketCharts['detail'].destroy();
+    
+    window.marketCharts['detail'] = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: hist.map(d => d.month),
+            datasets: [{
+                label: 'Cena (Kč)',
+                data: hist.map(d => d.price),
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                borderWidth: 2,
+                pointRadius: 0,
+                pointHoverRadius: 6,
+                fill: true,
+                tension: 0.2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { display: false },
+                y: { ticks: { font: { size: 10 } } }
+            }
+        }
+    });
+};
+
+window.updateTradePreview = (price) => {
+    const qty = parseFloat(document.getElementById('trade-qty').value) || 0;
+    document.getElementById('trade-preview').innerText = `${window.fmt(qty * price)} Kč`;
+};
+
+// === 2. ZÁLOŽKA: PORTFOLIO ===
+window.renderPortfolio = () => {
+    const el = document.getElementById("ex-content");
+    let totalValue = 0;
+    let totalInvested = 0;
+    const labels = [];
+    const values = [];
+    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#6366f1', '#ec4899', '#8b5cf6', '#14b8a6', '#f43f5e'];
+
+    const rows = window.marketInstruments.map(instr => {
+        const pos = window.marketState.portfolio[instr.id];
+        if(pos.amount <= 0) return '';
+        
+        const currentPrice = window.marketState.history[instr.id].slice(-1)[0].price;
+        const val = pos.amount * currentPrice;
+        const pnl = val - pos.invested;
+        
+        totalValue += val;
+        totalInvested += pos.invested;
+        labels.push(instr.name);
+        values.push(val);
+
+        return `
+            <div class="grid grid-cols-5 gap-4 items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
+                <div class="col-span-2 font-bold text-slate-800">${instr.name}</div>
+                <div class="text-right text-xs text-slate-500">${pos.amount.toFixed(2)} ks<br>Prům: ${window.fmt(pos.invested/pos.amount)} Kč</div>
+                <div class="text-right font-bold text-slate-800">${window.fmt(val)} Kč</div>
+                <div class="text-right text-xs font-bold ${pnl >= 0 ? 'text-emerald-500 bg-emerald-50' : 'text-red-500 bg-red-50'} py-1 px-2 rounded">
+                    ${pnl >= 0 ? '+' : ''}${window.fmt(pnl)} Kč
+                </div>
+            </div>
+        `;
+    }).join("");
+
+    el.innerHTML = `
+        <div class="p-8 max-w-6xl mx-auto h-full overflow-y-auto">
+            <div class="grid grid-cols-3 gap-6 mb-8">
+                <div class="col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <div class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Hodnota aktiv</div>
+                        <div class="text-4xl font-black text-slate-800">${window.fmt(totalValue)} Kč</div>
+                        <div class="text-sm mt-2 text-slate-500">Celkem zainvestováno: <span class="font-bold">${window.fmt(totalInvested)} Kč</span></div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Celkový Zisk/Ztráta</div>
+                        <div class="text-3xl font-black ${totalValue - totalInvested >= 0 ? 'text-emerald-500' : 'text-red-500'}">
+                            ${totalValue - totalInvested >= 0 ? '+' : ''}${window.fmt(totalValue - totalInvested)} Kč
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-span-1 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative h-40">
+                    <canvas id="portfolio-pie"></canvas>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                <h3 class="text-sm font-bold text-slate-800 mb-4">Detailní rozpis pozic</h3>
+                <div class="flex flex-col gap-2">
+                    ${rows || '<div class="text-center py-10 text-slate-400 text-sm italic">Portoflio je zatím prázdné. Začněte obchodovat.</div>'}
+                </div>
+            </div>
+        </div>
+    `;
+
+    if (values.length > 0) {
+        const ctxPie = document.getElementById('portfolio-pie').getContext('2d');
+        if (window.marketCharts['pie']) window.marketCharts['pie'].destroy();
+        window.marketCharts['pie'] = new Chart(ctxPie, {
+            type: 'doughnut',
+            data: { labels: labels, datasets: [{ data: values, backgroundColor: colors, borderWidth: 0 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+        });
+    }
+};
+
+// === 3. ZÁLOŽKA: HISTORIE OBCHODŮ ===
+window.renderHistory = () => {
+    const el = document.getElementById("ex-content");
+    
+    const rows = window.marketState.trades.slice().reverse().map(tr => {
+        const currentPrice = window.marketState.history[tr.id].slice(-1)[0].price;
+        const pnl = tr.type === 'Koupit' 
+            ? (currentPrice - tr.price) * tr.qty 
+            : 0; // U prodeje už PNL nerealizujeme dynamicky z aktuální ceny
+        
+        return `
+            <div class="grid grid-cols-6 gap-4 items-center p-4 border-b border-slate-100 hover:bg-slate-50 transition text-sm">
+                <div class="text-slate-400 text-xs">${tr.date}</div>
+                <div class="font-bold text-slate-800">${tr.name}</div>
+                <div class="font-bold ${tr.type === 'Koupit' ? 'text-emerald-500' : 'text-red-500'} uppercase text-xs">${tr.type}</div>
+                <div class="text-right text-slate-600">${tr.qty.toFixed(2)} ks</div>
+                <div class="text-right text-slate-600">${window.fmt(tr.price)} Kč</div>
+                <div class="text-right font-bold ${tr.type === 'Koupit' ? (pnl >= 0 ? 'text-emerald-500' : 'text-red-500') : 'text-slate-400'}">
+                    ${tr.type === 'Koupit' ? (pnl >= 0 ? '+' : '') + window.fmt(pnl) + ' Kč' : 'Uzavřeno'}
+                </div>
+            </div>
+        `;
+    }).join("");
+
+    el.innerHTML = `
+        <div class="p-8 max-w-5xl mx-auto h-full overflow-y-auto">
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="bg-slate-50 p-4 border-b border-slate-200 grid grid-cols-6 gap-4 text-xs font-bold text-slate-400 uppercase tracking-widest">
+                    <div>Datum</div><div>Aktivum</div><div>Operace</div><div class="text-right">Množství</div><div class="text-right">Realizační cena</div><div class="text-right">Aktuální P/L z nákupu</div>
+                </div>
+                <div class="flex flex-col">
+                    ${rows || '<div class="text-center py-10 text-slate-400 italic">Historie je zatím prázdná.</div>'}
+                </div>
+            </div>
+        </div>
+    `;
+};
+
+// === LOGIKA NÁKUPU A PRODEJE ===
+window.executeTrade = (action) => {
+    let playerMoney = typeof state.cash !== 'undefined' ? state.cash : state.money;
+    
+    const qty = parseFloat(document.getElementById('trade-qty').value);
+    if(isNaN(qty) || qty <= 0) return alert("Neplatné množství!");
+
+    const instrId = window.marketState.selectedId;
+    const instr = window.marketInstruments.find(i => i.id === instrId);
+    const hist = window.marketState.history[instrId];
+    const price = hist[hist.length - 1].price;
+    const totalCost = qty * price;
+    const pos = window.marketState.portfolio[instrId];
+
+    if (action === 'buy') {
+        if (playerMoney < totalCost) return alert("Nedostatek hotovosti!");
+        playerMoney -= totalCost;
+        pos.amount += qty;
+        pos.invested += totalCost;
+    } else {
+        if (pos.amount < qty) return alert("Nemáš dostatek kusů!");
+        const costBasis = (pos.invested / pos.amount) * qty; 
+        playerMoney += totalCost;
+        pos.amount -= qty;
+        pos.invested -= costBasis;
+    }
+
+    if(typeof state.cash !== 'undefined') state.cash = playerMoney;
+    else state.money = playerMoney;
+
+    // Zápis do historie
+    window.marketState.trades.push({
+        id: instrId,
+        name: instr.name,
+        type: action === 'buy' ? 'Koupit' : 'Prodat',
+        qty: qty,
+        price: price,
+        date: new Date().toLocaleDateString("cs-CZ")
+    });
+
+    if(typeof window.updateAll === 'function') window.updateAll();
+    const cashDisplay = document.getElementById('ex-cash-display');
+    if(cashDisplay) cashDisplay.innerText = `${window.fmt(playerMoney)} Kč`;
+
+    window.renderTradeDetail();
+};
+
+window.fmt = window.fmt || ((v) => Math.round(v).toLocaleString("cs-CZ"));
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        window.intW = () => { let q=quizBank[Math.floor(Math.random()*quizBank.length)]; showModal("Škola/Práce", q.q, null, null, q.opts.map((o,i)=>`<button onclick="if(${i===q.ans}){state.correctAnswers++;logTx('Výplata',1500);advanceTime();showModal('Správně','+1500 Kč.','Ok');}else{advanceTime();showModal('Špatně','Zkus to znovu.','Ok');}" class="w-full text-left p-3 border rounded mb-2 hover:bg-slate-50 font-bold">${o}</button>`).join('')); }
+
+            const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        canvas.width = 1920; canvas.height = 1080;
+        const TS = 24; const MAP_COLS = 80; const MAP_ROWS = 45; 
+
+        const bgImage = new Image();
+        bgImage.src = 'mapa.png'; 
+        const playerSpriteImage = new Image();
+        playerSpriteImage.src = 'avatar.png';
+
+        let collisionGrid = Array.from({ length: MAP_ROWS }, () => Array(MAP_COLS).fill(0));
+
+        function setRect(col, row, w, h, type = 1) {
+            for (let r = 0; r < h; r++) {
+                for (let c = 0; c < w; c++) {
+                    if (row + r < MAP_ROWS && col + c < MAP_COLS) collisionGrid[row + r][col + c] = type;
+                }
+            }
+        }
+
+        // Tvoje mřížka
+       setRect(0, 0, 7, 1, 1); setRect(47, 0, 33, 1, 1); setRect(0, 1, 7, 1, 1); setRect(33, 1, 6, 1, 1); setRect(47, 1, 33, 1, 1); 
+        setRect(0, 2, 7, 1, 1); setRect(33, 2, 6, 1, 1); setRect(47, 2, 33, 1, 1); setRect(0, 3, 6, 1, 1); setRect(33, 3, 12, 1, 1); 
+        setRect(48, 3, 32, 1, 1); setRect(0, 4, 6, 1, 1); setRect(33, 4, 12, 1, 1); setRect(49, 4, 31, 1, 1); setRect(0, 5, 7, 1, 1); 
+        setRect(13, 5, 6, 1, 1); setRect(33, 5, 12, 1, 1); setRect(50, 5, 30, 1, 1); setRect(0, 6, 7, 1, 1); setRect(12, 6, 7, 1, 1); 
+        setRect(33, 6, 12, 1, 1); setRect(49, 6, 31, 1, 1); setRect(0, 7, 4, 1, 1); setRect(6, 7, 1, 1, 1); setRect(9, 7, 14, 1, 1); 
+        setRect(33, 7, 12, 1, 1); setRect(49, 7, 31, 1, 1); setRect(0, 8, 4, 1, 1); setRect(9, 8, 14, 1, 1); setRect(33, 8, 12, 1, 1); 
+        setRect(49, 8, 31, 1, 1); setRect(0, 9, 4, 1, 1); setRect(9, 9, 14, 1, 1); setRect(33, 9, 12, 1, 1); setRect(49, 9, 15, 1, 1); 
+        setRect(66, 9, 14, 1, 1); setRect(0, 10, 4, 1, 1); setRect(9, 10, 14, 1, 1); setRect(33, 10, 12, 1, 1); setRect(49, 10, 15, 1, 1); 
+        setRect(67, 10, 13, 1, 1); setRect(0, 11, 5, 1, 1); setRect(9, 11, 14, 1, 1); setRect(33, 11, 12, 1, 1); setRect(49, 11, 15, 1, 1); 
+        setRect(67, 11, 13, 1, 1); setRect(0, 12, 3, 1, 1); setRect(4, 12, 2, 1, 1); setRect(9, 12, 14, 1, 1); setRect(33, 12, 12, 1, 1); 
+        setRect(49, 12, 15, 1, 1); setRect(67, 12, 13, 1, 1); setRect(0, 13, 3, 1, 1); setRect(4, 13, 2, 1, 1); setRect(9, 13, 14, 1, 1); 
+        setRect(33, 13, 12, 1, 1); setRect(49, 13, 15, 1, 1); setRect(68, 13, 12, 1, 1); setRect(0, 14, 3, 1, 1); setRect(9, 14, 14, 1, 1); 
+        setRect(33, 14, 12, 1, 1); setRect(49, 14, 15, 1, 1); setRect(69, 14, 11, 1, 1); setRect(0, 15, 2, 1, 1); setRect(9, 15, 14, 1, 1); 
+        setRect(33, 15, 5, 1, 1); setRect(41, 15, 4, 1, 1); setRect(49, 15, 15, 1, 1); setRect(71, 15, 9, 1, 1); setRect(0, 16, 1, 1, 1); 
+        setRect(9, 16, 6, 1, 1); setRect(17, 16, 6, 1, 1); setRect(33, 16, 4, 1, 1); setRect(41, 16, 2, 1, 1); setRect(44, 16, 1, 1, 1); 
+        setRect(49, 16, 6, 1, 1); setRect(59, 16, 5, 1, 1); setRect(72, 16, 8, 1, 1); setRect(12, 17, 2, 1, 1); setRect(18, 17, 2, 1, 1); 
+        setRect(33, 17, 4, 1, 1); setRect(42, 17, 3, 1, 1); setRect(49, 17, 4, 1, 1); setRect(61, 17, 3, 1, 1); setRect(75, 17, 5, 1, 1); 
+        setRect(33, 24, 1, 1, 1); setRect(57, 24, 14, 1, 1); setRect(1, 25, 2, 1, 1); setRect(8, 25, 2, 1, 1); setRect(13, 25, 3, 1, 1); 
+        setRect(32, 25, 3, 1, 1); setRect(45, 25, 1, 1, 1); setRect(57, 25, 14, 1, 1); setRect(0, 26, 6, 1, 1); setRect(8, 26, 8, 1, 1); 
+        setRect(32, 26, 3, 1, 1); setRect(40, 26, 9, 1, 1); setRect(57, 26, 15, 1, 1); setRect(0, 27, 6, 1, 1); setRect(7, 27, 9, 1, 1); 
+        setRect(32, 27, 3, 1, 1); setRect(40, 27, 3, 1, 1); setRect(45, 27, 4, 1, 1); setRect(57, 27, 15, 1, 1); setRect(0, 28, 15, 1, 1); 
+        setRect(17, 28, 2, 1, 1); setRect(23, 28, 22, 1, 1); setRect(48, 28, 1, 1, 1); setRect(57, 28, 16, 1, 1); setRect(0, 29, 15, 1, 1); 
+        setRect(16, 29, 3, 1, 1); setRect(23, 29, 22, 1, 1); setRect(48, 29, 1, 1, 1); setRect(57, 29, 16, 1, 1); setRect(0, 30, 13, 1, 1); 
+        setRect(16, 30, 3, 1, 1); setRect(21, 30, 1, 1, 1); setRect(23, 30, 22, 1, 1); setRect(48, 30, 1, 1, 1); setRect(57, 30, 6, 1, 1); 
+        setRect(66, 30, 7, 1, 1); setRect(0, 31, 13, 1, 1); setRect(21, 31, 1, 1, 1); setRect(23, 31, 22, 1, 1); setRect(48, 31, 1, 1, 1); 
+        setRect(57, 31, 6, 1, 1); setRect(67, 31, 6, 1, 1); setRect(0, 32, 13, 1, 1); setRect(21, 32, 1, 1, 1); setRect(23, 32, 7, 1, 1); 
+        setRect(31, 32, 14, 1, 1); setRect(47, 32, 2, 1, 1); setRect(57, 32, 1, 1, 1); setRect(71, 32, 2, 1, 1); setRect(0, 33, 13, 1, 1); 
+        setRect(21, 33, 1, 1, 1); setRect(23, 33, 9, 1, 1); setRect(35, 33, 10, 1, 1); setRect(57, 33, 1, 1, 1); setRect(71, 33, 2, 1, 1); 
+        setRect(0, 34, 13, 1, 1); setRect(15, 34, 2, 1, 1); setRect(21, 34, 1, 1, 1); setRect(23, 34, 6, 1, 1); setRect(38, 34, 7, 1, 1); 
+        setRect(57, 34, 1, 1, 1); setRect(71, 34, 2, 1, 1); setRect(0, 35, 14, 1, 1); setRect(15, 35, 2, 1, 1); setRect(21, 35, 1, 1, 1); 
+        setRect(23, 35, 4, 1, 1); setRect(40, 35, 5, 1, 1); setRect(57, 35, 6, 1, 1); setRect(66, 35, 6, 1, 1); setRect(0, 36, 14, 1, 1); 
+        setRect(15, 36, 2, 1, 1); setRect(21, 36, 1, 1, 1); setRect(23, 36, 4, 1, 1); setRect(40, 36, 5, 1, 1); setRect(46, 36, 3, 1, 1); 
+        setRect(0, 37, 14, 1, 1); setRect(21, 37, 1, 1, 1); setRect(23, 37, 4, 1, 1); setRect(40, 37, 5, 1, 1); setRect(48, 37, 1, 1, 1); 
+        setRect(0, 38, 16, 1, 1); setRect(21, 38, 1, 1, 1); setRect(23, 38, 4, 1, 1); setRect(40, 38, 2, 1, 1); setRect(43, 38, 1, 1, 1); 
+        setRect(48, 38, 1, 1, 1); setRect(0, 39, 16, 1, 1); setRect(21, 39, 1, 1, 1); setRect(23, 39, 4, 1, 1); setRect(40, 39, 4, 1, 1); 
+        setRect(48, 39, 1, 1, 1); setRect(0, 40, 15, 1, 1); setRect(21, 40, 1, 1, 1); setRect(48, 40, 1, 1, 1); setRect(0, 41, 15, 1, 1); 
+        setRect(16, 41, 3, 1, 1); setRect(35, 41, 14, 1, 1); setRect(0, 42, 14, 1, 1); setRect(16, 42, 3, 1, 1); setRect(58, 42, 1, 1, 1); 
+        setRect(61, 42, 2, 1, 1); setRect(64, 42, 1, 1, 1); setRect(66, 42, 5, 1, 1); setRect(72, 42, 2, 1, 1); setRect(75, 42, 1, 1, 1); 
+        setRect(78, 42, 2, 1, 1); setRect(0, 43, 14, 1, 1); setRect(16, 43, 3, 1, 1); setRect(58, 43, 2, 1, 1); setRect(61, 43, 2, 1, 1); 
+        setRect(64, 43, 1, 1, 1); setRect(66, 43, 5, 1, 1); setRect(72, 43, 2, 1, 1); setRect(75, 43, 2, 1, 1); setRect(78, 43, 2, 1, 1); 
+        setRect(0, 44, 19, 1, 1); setRect(58, 44, 2, 1, 1); setRect(67, 44, 1, 1, 1); setRect(69, 44, 2, 1, 1); setRect(72, 44, 1, 1, 1); 
+        setRect(76, 44, 1, 1, 1);
+
+        // OPRAVENÉ TRIGGERY BUDOV (Místo 10 mají správná čísla)
+        // 10 = Komerční Banka (střed nahoře)
+        setRect(38, 15, 3, 1, 10); setRect(37, 16, 4, 1, 10); setRect(37, 17, 5, 1, 10);
+        // 11 = ČNB (vpravo nahoře)
+        setRect(55, 16, 4, 1, 11); setRect(53, 17, 8, 1, 11); setRect(53, 18, 8, 1, 11);
+        // 12 = Burza (vlevo nahoře)
+        setRect(15, 16, 2, 1, 12); setRect(14, 17, 4, 1, 12); setRect(14, 18, 4, 1, 12);
+        // 13 = Škola (dole uprostřed)
+        setRect(32, 33, 2, 1, 13); setRect(34, 33, 1, 1, 13); setRect(32, 34, 3, 1, 13); setRect(32, 35, 3, 1, 13);
+        // 14 = Obchod/Tržnice (dole vpravo)
+        setRect(63, 30, 3, 1, 14); setRect(63, 31, 4, 1, 14); setRect(63, 32, 4, 1, 14);
+
+       const player = { 
+            x: 1920 / 2, y: 1080 / 2, w: 48, h: 48, 
+            speed: 250,      // Normální chůze
+            runSpeed: 450,   // Běh se Shiftem
+            spriteFrameWidth: 64, spriteFrameHeight: 64, 
+            currentDirection: 0, currentFrame: 0, animationCount: 0, isMoving: false
+        };
+        const keys = {};
+
+        const uiKeyMap = {
+                    'KeyW': 'key-w', 'KeyA': 'key-a', 'KeyS': 'key-s', 'KeyD': 'key-d',
+                    'ArrowUp': 'key-up', 'ArrowLeft': 'key-left', 'ArrowDown': 'key-down', 'ArrowRight': 'key-right',
+                    'ShiftLeft': 'key-shift', 'ShiftRight': 'key-shift', 'Space': 'key-space'
+                };
+
+                window.addEventListener('keydown', e => { 
+                    // Uloží klávesu VŽDY jako malou (řeší problém velkého W při držení Shiftu)
+                    keys[e.key.toLowerCase()] = true; 
+                    
+                    // Interakce ve hře
+                    if (e.key === ' ' && activeTrigger && document.getElementById('game-modal').classList.contains('hidden')) {
+                        e.preventDefault();
+                        if (activeTrigger === 10) window.intB1();         
+                        else if (activeTrigger === 11) window.intB2();    
+                        else if (activeTrigger === 12) window.intEx();    
+                        else if (activeTrigger === 13) window.intW();     
+                        else if (activeTrigger === 14) window.openShopModal();
+                    }
+
+                    // Animace legendy podle fyzické klávesy (ignoruje nesmysly jako PrintScreen)
+                    const id = uiKeyMap[e.code];
+                    if (id) {
+                        const el = document.getElementById(id);
+                        if (el) el.classList.add('pressed');
+                    }
+                });
+
+                window.addEventListener('keyup', e => { 
+                    keys[e.key.toLowerCase()] = false; 
+                    
+                    const id = uiKeyMap[e.code];
+                    if (id) {
+                        const el = document.getElementById(id);
+                        if (el) el.classList.remove('pressed');
+                    }
+                });
+        function isWalkable(nx, ny) {
+            const pts = [{x: nx, y: ny}, {x: nx + player.w, y: ny}, {x: nx, y: ny + player.h}, {x: nx + player.w, y: ny + player.h}];
+            for (let pt of pts) {
+                let c = Math.floor(pt.x / TS), r = Math.floor(pt.y / TS);
+                if (c < 0 || c >= MAP_COLS || r < 0 || r >= MAP_ROWS) return false;
+                if (collisionGrid[r][c] === 1) return false; 
+            }
+            return true;
+        }
+
+        let activeTrigger = 0;
+        function checkTriggers() {
+                    let c = Math.floor((player.x + player.w/2) / TS), r = Math.floor((player.y + player.h/2) / TS);
+                    let triggerFound = 0;
+                    const dirs = [{row:-1,col:0}, {row:1,col:0}, {row:0,col:-1}, {row:0,col:1}, {row:0,col:0}];
+                    for(let d of dirs) {
+                        let tile = collisionGrid[r + d.row]?.[c + d.col] || 0;
+                        if(tile >= 10) triggerFound = tile;
+                    }
+                    activeTrigger = triggerFound;
+                    
+                    const overlay = document.getElementById('interaction-overlay');
+                    const isModalOpen = !document.getElementById('game-modal').classList.contains('hidden');
+                    
+                    // Mezerník se ukáže jen když je trigger A ZÁROVEŇ není otevřené žádné okno
+                    if (overlay) {
+                        overlay.style.display = (triggerFound > 0 && !isModalOpen) ? 'block' : 'none';
+                    }
+                }
+
+        let lastTime = performance.now();
+        function gameLoop(currentTime) {
+            let dt = Math.min((currentTime - lastTime) / 1000, 0.1);
+            lastTime = currentTime;
+
+            let dx = 0, dy = 0;
+            player.isMoving = false;
+
+            const isMenuOpen = !document.getElementById('game-modal').classList.contains('hidden');
+            const isGameTabActive = !document.getElementById('tab-game').classList.contains('hidden');
+
+            // Hýbej se jen když hraješ hru
+                        let currentSpeed = keys.shift ? player.runSpeed : player.speed;
+
+                        if (!isMenuOpen && isGameTabActive) {
+                            // Názvy šipek musí být malými písmeny!
+                            if (keys.w || keys.arrowup)    { dy -= currentSpeed * dt; player.currentDirection = 2; player.isMoving = true; }
+                            if (keys.s || keys.arrowdown)  { dy += currentSpeed * dt; player.currentDirection = 0; player.isMoving = true; }
+                            if (keys.a || keys.arrowleft)  { dx -= currentSpeed * dt; player.currentDirection = 3; player.isMoving = true; }
+                            if (keys.d || keys.arrowright) { dx += currentSpeed * dt; player.currentDirection = 1; player.isMoving = true; }
+
+                            if (dx !== 0 && dy !== 0) { dx *= 0.707; dy *= 0.707; }
+
+                            if (dx !== 0 && isWalkable(player.x + dx, player.y)) player.x += dx;
+                            if (dy !== 0 && isWalkable(player.x, player.y + dy)) player.y += dy;
+                        }
+
+            // Animace Goblina
+            if (player.isMoving) {
+                player.animationCount += dt * 15;
+                if (player.animationCount >= 1) {
+                    player.currentFrame = (player.currentFrame + 1) % state.skinFrames;
+                    player.animationCount = 0;
+                }
+            } else {
+                player.currentFrame = 0;
+            }
+
+            player.x = Math.max(0, Math.min(player.x, canvas.width - player.w));
+            player.y = Math.max(0, Math.min(player.y, canvas.height - player.h));
+
+            checkTriggers();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (bgImage.complete && bgImage.naturalWidth > 0) {
+                ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
+            }
+
+            if (playerSpriteImage.complete && playerSpriteImage.naturalWidth > 0) {
+                const sx = player.currentFrame * state.skinW;
+                const mappedDir = (state.skinDirMap || [0, 1, 2, 3])[player.currentDirection];
+                const sy = mappedDir * state.skinH;
+                ctx.drawImage(
+                    playerSpriteImage, 
+                    sx, sy, state.skinW, state.skinH, 
+                    player.x - 40, player.y - 80, 128, 128 // Můžeš upravit 128,128 pokud bude liška moc velká/malá
+                );
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        initGame();
+    </script>
+</body>
+</html>
