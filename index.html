@@ -168,6 +168,17 @@
             <div class="bg-white rounded-3xl p-8 max-w-2xl w-full shadow-2xl border-2 border-slate-200 max-h-[90vh] overflow-y-auto relative" id="game-modal-content"></div>
         </div>
 
+        <!-- ========= CHAPTER LEARNING MODAL ========= -->
+        <div id="chapter-modal" class="fixed inset-0 bg-slate-900/95 z-[60] items-center justify-center backdrop-blur-md p-4" style="display:none;">
+            <div class="bg-white rounded-3xl w-full max-w-4xl shadow-2xl max-h-[92vh] flex flex-col overflow-hidden" style="font-family:'Inter',sans-serif;">
+                <div id="chapter-modal-header" class="bg-gradient-to-br from-blue-600 to-indigo-900 p-6 text-white flex justify-between items-start shrink-0" style="min-height:100px;"></div>
+                <div class="border-b border-slate-200 bg-white shrink-0 overflow-x-auto">
+                    <div class="flex min-w-max" id="chapter-tab-nav"></div>
+                </div>
+                <div class="flex-1 overflow-y-auto p-6 bg-slate-50" id="chapter-tab-content"></div>
+            </div>
+        </div>
+
         <div class="flex-1 p-8 w-full max-w-7xl mx-auto">
             
             <div id="tab-dashboard" class="tab-content hidden h-full flex flex-col">
@@ -256,13 +267,14 @@
                         <span class="text-xs font-bold text-blue-500 bg-blue-50 px-3 py-1 rounded-full">Kapitoly 1–10</span>
                     </div>
                     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                        <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-blue-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
-                            <div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center mb-3 group-hover:bg-blue-500 transition-colors">
-                                <i class="fas fa-coins text-blue-500 group-hover:text-white transition-colors"></i>
+                        <div class="obsah-card group bg-white rounded-2xl border-2 border-blue-400 p-5 hover:border-blue-600 hover:shadow-xl transition-all cursor-pointer hover:-translate-y-1 relative shadow-md" onclick="openChapterModal(1)">
+                            <div class="absolute -top-2 -right-2 bg-blue-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full shadow-md z-10 uppercase tracking-wide">Nové</div>
+                            <div class="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center mb-3 transition-colors group-hover:bg-blue-700">
+                                <i class="fas fa-coins text-white transition-colors"></i>
                             </div>
-                            <span class="text-xs font-bold text-blue-400 uppercase tracking-wider">Kapitola 1</span>
+                            <span class="text-xs font-bold text-blue-500 uppercase tracking-wider">Kapitola 1</span>
                             <h4 class="font-black text-slate-800 mt-1 text-sm leading-snug">Co jsou peníze?</h4>
-                            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Obsah doplníš sám</p>
+                            <p class="text-xs text-blue-500 mt-2 leading-relaxed font-semibold flex items-center gap-1"><i class="fas fa-play-circle text-blue-400"></i>&nbsp;Otevřít lekci</p>
                         </div>
                         <div class="obsah-card group bg-white rounded-2xl border border-slate-200 p-5 hover:border-blue-400 hover:shadow-lg transition-all cursor-pointer hover:-translate-y-0.5">
                             <div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center mb-3 group-hover:bg-blue-500 transition-colors">
@@ -682,6 +694,7 @@
         // --- LOGIKA A DATA ---
                 let state = {
                     cash: 5000, bank: 0, bonds: [], stocksOwned: 0,
+                    savings: 0, loans: [],
                     month: 1, year: 2026, inflationRate: 0.0,
                     avatarEmoji: '👨‍🎓', 
                     items: ['skin_troll'], // ZMĚNA: Hráč už od začátku vlastní Trola
@@ -1075,6 +1088,367 @@
                     if(mCb) mCb(); 
                     mCb = null; 
                 }
+
+        // ==========================================
+        // ====  CHAPTER LEARNING MODAL SYSTEM  ====
+        // ==========================================
+
+        window._ch1Quiz = { answers: {}, submitted: false };
+
+        window.closeChapterModal = function() {
+            document.getElementById('chapter-modal').style.display = 'none';
+            window._ch1Quiz = { answers: {}, submitted: false };
+        };
+
+        window.openChapterModal = function(num) {
+            if (num !== 1) {
+                showModal('Brzy k dispozici', 'Tato kapitola se teprve připravuje. Sleduj aktualizace!', 'Zavřít', null);
+                return;
+            }
+            var modal = document.getElementById('chapter-modal');
+            modal.style.display = 'flex';
+            window._ch1Quiz = { answers: {}, submitted: false };
+
+            document.getElementById('chapter-modal-header').innerHTML =
+                '<div>' +
+                '<span style="color:#bfdbfe;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.12em;">Kapitola 1 &nbsp;·&nbsp; Základy peněz</span>' +
+                '<h2 style="font-size:1.8rem;font-weight:900;margin:6px 0 0;">Co jsou peníze?</h2>' +
+                '<p style="color:#bfdbfe;margin-top:4px;font-size:0.85rem;">Základní stavební kámen finanční gramotnosti &nbsp;·&nbsp; 5 interaktivních sekcí</p>' +
+                '</div>' +
+                '<button onclick="closeChapterModal()" style="color:white;font-size:1.4rem;cursor:pointer;background:rgba(255,255,255,0.15);border:none;width:38px;height:38px;border-radius:50%;margin-top:4px;display:flex;align-items:center;justify-content:center;transition:background 0.2s;" onmouseover="this.style.background=\'rgba(255,255,255,0.3)\'" onmouseout="this.style.background=\'rgba(255,255,255,0.15)\'">' +
+                '<i class="fas fa-times"></i></button>';
+
+            var tabs = [
+                { id: 'history',   label: 'Historie',      icon: 'fa-clock'          },
+                { id: 'functions', label: 'Funkce peněz',  icon: 'fa-exchange-alt'   },
+                { id: 'types',     label: 'Druhy peněz',   icon: 'fa-layer-group'    },
+                { id: 'quiz',      label: 'Kvíz',          icon: 'fa-question-circle'},
+                { id: 'glossary',  label: 'Slovník',       icon: 'fa-book'           },
+            ];
+
+            document.getElementById('chapter-tab-nav').innerHTML = tabs.map(function(t) {
+                return '<button class="ch-tab-btn" data-tab="' + t.id + '" onclick="renderChapterTab(\'' + t.id + '\')" ' +
+                    'style="padding:14px 22px;font-size:0.85rem;font-weight:700;border:none;border-bottom:2px solid transparent;background:none;cursor:pointer;color:#64748b;white-space:nowrap;transition:color 0.15s,border-color 0.15s;">' +
+                    '<i class="fas ' + t.icon + '" style="margin-right:6px;"></i>' + t.label + '</button>';
+            }).join('');
+
+            renderChapterTab('history');
+        };
+
+        window.renderChapterTab = function(tab) {
+            document.querySelectorAll('.ch-tab-btn').forEach(function(b) {
+                b.style.borderBottomColor = 'transparent';
+                b.style.color = '#64748b';
+            });
+            var active = document.querySelector('.ch-tab-btn[data-tab="' + tab + '"]');
+            if (active) { active.style.borderBottomColor = '#3b82f6'; active.style.color = '#2563eb'; }
+
+            var el = document.getElementById('chapter-tab-content');
+            if (tab === 'history')   el.innerHTML = _ch1History();
+            else if (tab === 'functions') el.innerHTML = _ch1Functions();
+            else if (tab === 'types')     el.innerHTML = _ch1Types();
+            else if (tab === 'quiz')      el.innerHTML = _ch1QuizTab();
+            else if (tab === 'glossary')  el.innerHTML = _ch1Glossary();
+        };
+
+        // ------- TAB 1: HISTOIRE -------
+        function _ch1History() {
+            var items = [
+                { date: '~9 000 př. n. l.', em: '🤝', title: 'Bartér – přímá výměna',
+                  desc: 'Před penězi lidé vyměňovali zboží přímo za jiné zboží. Farmář bral za ovce sůl, hrnčíř za džbány obilí.',
+                  fact: 'Problém bartéru: fungoval jen při „dvojí shodě potřeb" – obě strany musely chtít přesně to, co druhá nabídla.' },
+                { date: '~5 000 př. n. l.', em: '🐄', title: 'Komoditní peníze',
+                  desc: 'Vzácné komodity s vnitřní hodnotou sloužily jako platidlo – dobytek, obilí, sůl, mušle kauri, jantar.',
+                  fact: 'Slovo „salary" pochází z latinského „salarium" – plat vyplácený v soli. Sůl byla tak vzácná, že se jí platilo!' },
+                { date: '~1 000 př. n. l.', em: '🪙', title: 'První kovové mince',
+                  desc: 'Čína razí první bronzové mince ve tvaru nástrojů. Lydská říše (dnešní Turecko) jako první razí elektrum – slitinu zlata a stříbra.',
+                  fact: 'Lydský král Kroisos byl tak bohatý, že jeho jméno dodnes znamená „bohatý jako Kroisos".' },
+                { date: '~600 př. n. l.', em: '⚖️', title: 'Standardizované mince',
+                  desc: 'Řecko a Řím zavádějí standardizované mince se státní zárukou hodnoty. Obchod exploduje napříč Středomořím.',
+                  fact: null },
+                { date: '~1 000 n. l.', em: '📜', title: 'Papírové peníze – Čína',
+                  desc: 'Čínská říše jako první zavádí papírové peníze (jiaozi). Papír je mnohem lehčí než zlaté mince – revoluční inovace!',
+                  fact: 'Marco Polo přivezl myšlenku papírových peněz do Evropy. Evropané tomu zprvu odmítali uvěřit.' },
+                { date: '1609', em: '🏛️', title: 'Moderní bankovnictví – Amsterdam',
+                  desc: 'Amsterdamská banka (Wisselbank) se stává první moderní bankou. Lidé vkládají zlato a dostávají papírové poukázky – zrod bankovních vkladů.',
+                  fact: 'Právě tady vznikl systém částečných rezerv: banka půjčuje více, než fyzicky drží. Základní princip dodnes.' },
+                { date: '1870–1914', em: '🥇', title: 'Zlatý standard',
+                  desc: 'Velká Británie zavedla zlatý standard – každá bankovka má pevně danou zlatou krytinu. Brzy ho přijal celý svět.',
+                  fact: 'Zlatý standard omezoval inflaci, ale byl příliš rigidní. V krizích státy nemohly tisknout peníze podle potřeby.' },
+                { date: '1944', em: '🌍', title: 'Bretton Woods – USD světovou rezervní měnou',
+                  desc: 'Po 2. světové válce se USA stávají ekonomickou velmocí. USD je navázán na zlato, ostatní měny na USD. Vzniká globální měnový systém.',
+                  fact: null },
+                { date: '1971', em: '🔓', title: 'Konec zlatého standardu – Nixon šok',
+                  desc: 'Prezident Nixon ruší navázání USD na zlato. Vznikají „fiat peníze" – peníze kryté pouze zákonem a důvěrou lidí.',
+                  fact: 'Od tohoto okamžiku jsou VŠECHNY světové měny fiat peníze. Jejich hodnota není kryta žádnou fyzickou komoditou.' },
+                { date: '2009', em: '₿', title: 'Bitcoin – decentralizované digitální peníze',
+                  desc: 'Satoshi Nakamoto (záhadná anonymní osoba) spouští Bitcoin – první kryptoměnu bez centrální banky, bez hranic.',
+                  fact: 'Bitcoin Pizza Day: 22. 5. 2010 Laszlo Hanyecz zaplatil 10 000 BTC za dvě pizzy. Dnes by to bylo stovky milionů Kč.' },
+            ];
+
+            var h = '<div style="max-width:680px;margin:0 auto;">' +
+                '<h3 style="font-size:1.4rem;font-weight:900;color:#1e293b;margin-bottom:4px;">Příběh peněz</h3>' +
+                '<p style="color:#64748b;margin-bottom:28px;font-size:0.9rem;">Od bartéru k bitcoinu – 11 000 let evoluce platidel</p>' +
+                '<div style="position:relative;">' +
+                '<div style="position:absolute;left:23px;top:0;bottom:0;width:2px;background:linear-gradient(to bottom,#3b82f6,#8b5cf6,#f59e0b);opacity:0.3;"></div>';
+
+            items.forEach(function(it) {
+                h += '<div style="display:flex;gap:16px;margin-bottom:22px;position:relative;">' +
+                    '<div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#1d4ed8);display:flex;align-items:center;justify-content:center;font-size:1.15rem;flex-shrink:0;z-index:1;box-shadow:0 4px 12px rgba(59,130,246,0.35);">' + it.em + '</div>' +
+                    '<div style="flex:1;background:white;border:1px solid #e2e8f0;border-radius:16px;padding:18px;box-shadow:0 1px 4px rgba(0,0,0,0.05);">' +
+                    '<div style="font-size:11px;font-weight:800;color:#3b82f6;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">' + it.date + '</div>' +
+                    '<h4 style="font-weight:900;color:#1e293b;font-size:0.93rem;margin-bottom:6px;">' + it.title + '</h4>' +
+                    '<p style="font-size:0.84rem;color:#64748b;line-height:1.65;">' + it.desc + '</p>' +
+                    (it.fact ? '<div style="margin-top:10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px 14px;font-size:12px;color:#1d4ed8;line-height:1.55;"><i class="fas fa-lightbulb" style="color:#3b82f6;margin-right:6px;"></i>' + it.fact + '</div>' : '') +
+                    '</div></div>';
+            });
+
+            h += '</div></div>';
+            return h;
+        }
+
+        // ------- TAB 2: FUNKCE PENĚZ -------
+        function _ch1Functions() {
+            var fns = [
+                { em: '💱', c: '#3b82f6', bg: '#eff6ff', bd: '#bfdbfe',
+                  title: 'Prostředek směny', sub: 'Medium of Exchange',
+                  desc: 'Peníze jsou prostředník při obchodování. Odstraňují nutnost hledat partnera, který chce přesně to, co nabízíš, a zároveň nabízí přesně to, co chceš.',
+                  ex: 'Jdeš do pekárny, koupíš chleba za 30 Kč. Pekaři nezáleží, co ty umíš – chce jenom peníze, které pak za cokoliv vymění.',
+                  wo: 'Bez peněz: Pokud umíš opravovat počítače, musíš najít pekaře s rozbitým počítačem. Problém „dvojí shody potřeb" bartéru.',
+                  key: 'Historicky PRVNÍ a nejdůležitější funkce. Peníze vznikly právě proto, aby tuto překážku odstranily.' },
+                { em: '💰', c: '#10b981', bg: '#f0fdf4', bd: '#a7f3d0',
+                  title: 'Uchovatel hodnoty', sub: 'Store of Value',
+                  desc: 'Peníze ti umožňují vydělat teď a utratit kdykoliv v budoucnu. Narozdíl od jahod, ryb nebo čerstvého chleba se peníze nezkazí.',
+                  ex: 'Uložíš 200 000 Kč na spořicí účet. Za 3 roky peníze stále máš (nominálně) a koupíš si auto nebo dovolenou.',
+                  wo: 'Bez peněz: Farmář musí úrodu prodat nebo spotřebovat okamžitě. Nedokáže si snadno „uložit" přebytek na zimu.',
+                  key: 'Pozor: Inflace tuto funkci oslabuje! 100 Kč v roce 2000 koupilo výrazně více než dnes. Viz Kapitola 5.' },
+                { em: '📏', c: '#f59e0b', bg: '#fffbeb', bd: '#fde68a',
+                  title: 'Měrná jednotka', sub: 'Unit of Account',
+                  desc: 'Peníze jsou společný „jazyk" pro vyjádření hodnoty čehokoliv. Umožňují porovnávat ceny zcela odlišných věcí.',
+                  ex: 'Notebook stojí 25 000 Kč, bicykl 12 000 Kč. Okamžitě víš, že notebook je přes 2× dražší. Bez měrné jednotky by srovnání bylo nemožné.',
+                  wo: 'Bez měrné jednotky: Musíš pamatovat tisíce cen – chleba za 3 vejce nebo 0,5 kg obilí nebo 10 min práce kováře...',
+                  key: 'Díky měrné jednotce fungují ceny, rozpočty, účetnictví, daně a celá moderní tržní ekonomika.' },
+            ];
+
+            var h = '<div style="max-width:100%;">' +
+                '<h3 style="font-size:1.4rem;font-weight:900;color:#1e293b;margin-bottom:4px;">Tři funkce peněz</h3>' +
+                '<p style="color:#64748b;margin-bottom:24px;font-size:0.9rem;">Aby něco mohlo sloužit jako peníze, musí plnit tyto tři základní funkce</p>';
+
+            fns.forEach(function(fn) {
+                h += '<div style="background:white;border:1px solid #e2e8f0;border-radius:20px;padding:26px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,0.05);">' +
+                    '<div style="display:flex;align-items:center;gap:18px;margin-bottom:18px;">' +
+                    '<div style="width:64px;height:64px;background:' + fn.bg + ';border:2px solid ' + fn.bd + ';border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:1.9rem;flex-shrink:0;">' + fn.em + '</div>' +
+                    '<div><h4 style="font-weight:900;font-size:1.15rem;color:#1e293b;margin-bottom:4px;">' + fn.title + '</h4>' +
+                    '<span style="font-size:11px;font-weight:700;color:' + fn.c + ';background:' + fn.bg + ';padding:3px 12px;border-radius:20px;">' + fn.sub + '</span></div></div>' +
+                    '<p style="color:#374151;font-size:0.88rem;line-height:1.7;margin-bottom:18px;">' + fn.desc + '</p>' +
+                    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">' +
+                    '<div style="background:' + fn.bg + ';border:1px solid ' + fn.bd + ';border-radius:12px;padding:14px;">' +
+                    '<div style="font-size:11px;font-weight:800;color:' + fn.c + ';text-transform:uppercase;margin-bottom:6px;letter-spacing:0.06em;"><i class="fas fa-check-circle" style="margin-right:4px;"></i>Příklad z praxe</div>' +
+                    '<p style="font-size:0.82rem;color:#374151;line-height:1.6;">' + fn.ex + '</p></div>' +
+                    '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:14px;">' +
+                    '<div style="font-size:11px;font-weight:800;color:#dc2626;text-transform:uppercase;margin-bottom:6px;letter-spacing:0.06em;"><i class="fas fa-times-circle" style="margin-right:4px;"></i>Bez peněz</div>' +
+                    '<p style="font-size:0.82rem;color:#374151;line-height:1.6;">' + fn.wo + '</p></div></div>' +
+                    '<div style="background:#f8fafc;border-left:3px solid ' + fn.c + ';padding:10px 16px;border-radius:0 8px 8px 0;font-size:0.82rem;color:#374151;font-weight:600;line-height:1.55;">' +
+                    '<i class="fas fa-info-circle" style="color:' + fn.c + ';margin-right:6px;"></i>' + fn.key + '</div></div>';
+            });
+
+            h += '</div>';
+            return h;
+        }
+
+        // ------- TAB 3: DRUHY PENĚZ -------
+        function _ch1Types() {
+            var types = [
+                { em: '💵', c: '#3b82f6', bg: '#eff6ff', bd: '#93c5fd', title: 'Hotovost',
+                  sub: 'Mince a bankovky', icon: 'fa-money-bill-wave',
+                  traits: ['Fyzická – drží se v ruce','Okamžitá – bez internetu a elektřiny','Anonymní – transakce není sledovatelná','V ČR vydává výhradně ČNB'],
+                  pros: 'Funguje bez elektřiny a internetu. Nikdo nesleduje co kupuješ. Nulové poplatky.',
+                  cons: 'Dá se ztratit nebo ukrást. Nevhodná pro velké platby. Podléhá padělání.',
+                  fact: 'V oběhu je přes 700 miliard Kč v hotovosti, přesto většina transakcí probíhá bezhotovostně.' },
+                { em: '🏦', c: '#10b981', bg: '#f0fdf4', bd: '#6ee7b7', title: 'Bezhotovostní peníze',
+                  sub: 'Bankovní vklady', icon: 'fa-university',
+                  traits: ['Uložené v bance na účtu','Pojištěné FGVÚ do 100 000 EUR','Sledovatelné – doložitelný výpis','Přenositelné převodem nebo kartou'],
+                  pros: 'Bezpečné, pojištěné státem. Snadno převoditelné. Ideální pro velké částky.',
+                  cons: 'Závislé na bance a systémech. Banka může selhat. Není anonymní.',
+                  fact: 'V ČR je přes 90 % všech peněz v bezhotovostní formě – jako záznamy v databázích bank.' },
+                { em: '📱', c: '#8b5cf6', bg: '#f5f3ff', bd: '#c4b5fd', title: 'Elektronické platby',
+                  sub: 'Karty a platební aplikace', icon: 'fa-mobile-alt',
+                  traits: ['Platební karty (Visa, Mastercard)','Mobilní platby (Apple Pay, Google Pay)','Rychlé bankovní převody (FPS)','QR platby a internetové bankovnictví'],
+                  pros: 'Rychlé a pohodlné. Bezkontaktní. Přijímány téměř všude. Bezpečné.',
+                  cons: 'Vyžadují infrastrukturu (internet, terminál). Poplatky obchodníkům 1–3 %.',
+                  fact: 'Průměrný Čech provede přes 100 karetních transakcí měsíčně. COVID dramaticky urychlil bezkontaktní platby.' },
+                { em: '₿', c: '#f59e0b', bg: '#fffbeb', bd: '#fcd34d', title: 'Kryptoměny',
+                  sub: 'Decentralizované digitální měny', icon: 'fa-bitcoin',
+                  traits: ['Decentralizované – žádná centrální banka','Bitcoin, Ethereum, Solana a tisíce dalších','Globální převody bez zprostředkovatele','Volatilní – cena se rychle a dramaticky mění'],
+                  pros: 'Globální převody bez povolení bank. Odolné vůči cenzuře. Transparentní blockchain.',
+                  cons: 'Extrémně volatilní. Složité pro běžné použití. Regulatorní nejistota po celém světě.',
+                  fact: 'Bitcoin má pevně stanovenou maximální zásobu 21 milionů mincí – naprogramovaná vzácnost, jako zlato.' },
+            ];
+
+            var h = '<div style="max-width:100%;">' +
+                '<h3 style="font-size:1.4rem;font-weight:900;color:#1e293b;margin-bottom:4px;">Druhy peněz</h3>' +
+                '<p style="color:#64748b;margin-bottom:24px;font-size:0.9rem;">Jak peníze existují v moderní ekonomice – od mincí po bitcoin</p>' +
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">';
+
+            types.forEach(function(t) {
+                h += '<div style="background:white;border:1px solid #e2e8f0;border-radius:20px;padding:22px;box-shadow:0 2px 8px rgba(0,0,0,0.05);display:flex;flex-direction:column;">' +
+                    '<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">' +
+                    '<div style="width:54px;height:54px;background:' + t.bg + ';border:2px solid ' + t.bd + ';border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;">' + t.em + '</div>' +
+                    '<div><h4 style="font-weight:900;font-size:0.97rem;color:#1e293b;">' + t.title + '</h4>' +
+                    '<span style="font-size:11px;font-weight:700;color:' + t.c + ';">' + t.sub + '</span></div></div>' +
+                    '<ul style="list-style:none;padding:0;margin:0 0 14px;flex:1;">' +
+                    t.traits.map(function(tr) {
+                        return '<li style="font-size:0.81rem;color:#374151;padding:5px 0;border-bottom:1px solid #f1f5f9;display:flex;align-items:flex-start;gap:8px;">' +
+                            '<span style="color:' + t.c + ';font-size:0.7rem;margin-top:4px;flex-shrink:0;">●</span>' + tr + '</li>';
+                    }).join('') +
+                    '</ul>' +
+                    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">' +
+                    '<div style="background:' + t.bg + ';border-radius:10px;padding:10px;font-size:11px;line-height:1.5;color:#374151;">' +
+                    '<span style="display:block;font-weight:800;color:' + t.c + ';margin-bottom:4px;"><i class="fas fa-plus" style="margin-right:3px;"></i>Výhody</span>' + t.pros + '</div>' +
+                    '<div style="background:#fef2f2;border-radius:10px;padding:10px;font-size:11px;line-height:1.5;color:#374151;">' +
+                    '<span style="display:block;font-weight:800;color:#dc2626;margin-bottom:4px;"><i class="fas fa-minus" style="margin-right:3px;"></i>Nevýhody</span>' + t.cons + '</div></div>' +
+                    '<div style="background:#f8fafc;border-radius:10px;padding:10px;font-size:11px;color:#64748b;line-height:1.5;border-left:3px solid ' + t.c + ';">' +
+                    '<i class="fas fa-info-circle" style="color:' + t.c + ';margin-right:4px;"></i>' + t.fact + '</div></div>';
+            });
+
+            h += '</div></div>';
+            return h;
+        }
+
+        // ------- TAB 4: KVÍZ -------
+        function _ch1QuizTab() {
+            var qs = [
+                { q: 'Jaká je PRIMÁRNÍ funkce peněz?',
+                  opts: ['Uchovatel hodnoty – peníze si lze ušetřit na later', 'Prostředek směny – peníze usnadňují obchod místo bartéru', 'Měrná jednotka – peníze vyjadřují hodnotu věcí v číslech'],
+                  ans: 1, exp: 'Prostředek směny je historicky první a nejzákladnější funkce. Peníze vznikly právě proto, aby nahradily nepraktický bartér. Uchovatel hodnoty a měrná jednotka jsou také klíčové, ale bez funkce prostředku směny by peníze neměly smysl.' },
+                { q: 'Jaký systém existoval PŘED vznikem peněz?',
+                  opts: ['Úvěrové karty a dluhopisy s úrokovou sazbou', 'Zlatý standard – každá mince měla zlatou krytinu', 'Bartér – přímá výměna zboží za jiné zboží'],
+                  ans: 2, exp: 'Bartér (přímá výměna) předcházel peněžní ekonomice. Byl to přirozený, ale velmi omezený systém. Jeho klíčový problém: nutná „dvojí shoda potřeb" – zemědělec hledající kovář musel najít kováře, který potřebuje právě obilí.' },
+                { q: 'Kdo v České republice vydává bankovky a mince?',
+                  opts: ['Ministerstvo financí ČR po schválení parlamentem', 'Komerční banky jako Komerční banka nebo ČSOB', 'Česká národní banka (ČNB)'],
+                  ans: 2, exp: 'Česká národní banka (ČNB) je jedinou institucí s právem emitovat bankovky a mince v ČR. ČNB je nezávislá centrální banka, která řídí měnovou politiku – rozhoduje o výši úrokových sazeb a množství peněz v oběhu. Komerční banky peníze nevydávají, ale „vytvářejí" bezhotovostní peníze půjčkami.' },
+                { q: 'Co jsou „fiat peníze" (Kč, Euro, USD)?',
+                  opts: ['Peníze plně kryté zlatem uloženým v centrální bance', 'Peníze, jejichž hodnota je daná zákonem a důvěrou lidí', 'Pouze digitální kryptoměny bez fyzické formy'],
+                  ans: 1, exp: 'Fiat peníze (z latinského „fiat" = ať se stane) mají hodnotu proto, že vláda je prohlásí za zákonné platidlo a lidé jim důvěřují. Od roku 1971, kdy USA opustily zlatý standard, jsou VŠECHNY světové měny fiat peníze – jejich hodnota není kryta žádnou konkrétní komoditou.' },
+                { q: 'Která z těchto NENÍ vlastností dobrých peněz?',
+                  opts: ['Přenosnost – dají se snadno přenášet a převádět', 'Unikátnost – každá bankovka musí být zcela jedinečná', 'Dělitelnost – dají se rozdělit na menší části (mince, drobné)'],
+                  ans: 1, exp: 'Dobrá platidla musí být přenosná (lehká, malá), dělitelná (mince, drobné), trvanlivá (nevyblednou), JEDNOTNÁ – ne unikátní! Každá stokoruna musí mít STEJNOU hodnotu jako jiná stokoruna. Unikátnost (jako u uměleckých děl) by systém plateb zcela zničila. Musí být také těžko padělatelná.' },
+            ];
+
+            if (!window._ch1Quiz) window._ch1Quiz = { answers: {}, submitted: false };
+
+            var h = '<div style="max-width:680px;margin:0 auto;">' +
+                '<h3 style="font-size:1.4rem;font-weight:900;color:#1e293b;margin-bottom:4px;">Kvíz: Co jsou peníze?</h3>' +
+                '<p style="color:#64748b;margin-bottom:24px;font-size:0.9rem;">5 otázek · Vyber správnou odpověď a zjisti, co jsi pochopil</p>';
+
+            if (window._ch1Quiz.submitted) {
+                var score = 0;
+                qs.forEach(function(q, i) { if (window._ch1Quiz.answers[i] === q.ans) score++; });
+                var pct = Math.round(score / qs.length * 100);
+                var medal = pct >= 80 ? '🏆' : pct >= 60 ? '🥈' : '📚';
+                var msg = pct >= 80 ? 'Výborně! Peníze zvládáš na jedničku.' : pct >= 60 ? 'Dobrý výsledek! Pár věcí si ještě zopakuj.' : 'Zkus si projít lekci znovu a opakuj kvíz.';
+                var scoreColor = pct >= 80 ? '#10b981' : pct >= 60 ? '#f59e0b' : '#ef4444';
+
+                h += '<div style="background:linear-gradient(135deg,#1e293b,#334155);border-radius:20px;padding:32px;text-align:center;margin-bottom:28px;color:white;">' +
+                    '<div style="font-size:3rem;margin-bottom:10px;">' + medal + '</div>' +
+                    '<div style="font-size:2.5rem;font-weight:900;margin-bottom:6px;">' + score + ' / ' + qs.length + '</div>' +
+                    '<div style="font-size:0.9rem;color:#94a3b8;margin-bottom:18px;">' + msg + '</div>' +
+                    '<div style="background:rgba(255,255,255,0.1);border-radius:50px;height:10px;max-width:200px;margin:0 auto;">' +
+                    '<div style="height:100%;width:' + pct + '%;background:' + scoreColor + ';border-radius:50px;transition:width 1.2s ease;"></div>' +
+                    '</div><div style="font-size:12px;margin-top:6px;font-weight:700;color:#cbd5e1;">' + pct + ' %</div></div>';
+
+                qs.forEach(function(q, i) {
+                    var ua = window._ch1Quiz.answers[i];
+                    var ok = ua === q.ans;
+                    h += '<div style="background:white;border:2px solid ' + (ok ? '#10b981' : '#ef4444') + ';border-radius:16px;padding:20px;margin-bottom:16px;">' +
+                        '<div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:14px;">' +
+                        '<div style="width:28px;height:28px;border-radius:50%;background:' + (ok ? '#10b981' : '#ef4444') + ';display:flex;align-items:center;justify-content:center;color:white;font-size:13px;flex-shrink:0;">' +
+                        '<i class="fas ' + (ok ? 'fa-check' : 'fa-times') + '"></i></div>' +
+                        '<p style="font-weight:800;color:#1e293b;font-size:0.9rem;margin:0;">' + q.q + '</p></div>' +
+                        '<div style="margin-left:40px;">';
+                    q.opts.forEach(function(opt, j) {
+                        var isU = j === ua; var isC = j === q.ans;
+                        var s = isC ? 'background:#f0fdf4;border:1.5px solid #10b981;color:#065f46;' :
+                            (isU && !isC) ? 'background:#fef2f2;border:1.5px solid #ef4444;color:#7f1d1d;' :
+                            'background:#f8fafc;border:1px solid #e2e8f0;color:#94a3b8;';
+                        h += '<div style="' + s + 'border-radius:10px;padding:9px 14px;margin-bottom:6px;font-size:0.82rem;font-weight:600;display:flex;align-items:center;gap:8px;">' +
+                            '<span style="width:20px;height:20px;border-radius:50%;background:' + (isC ? '#10b981' : isU ? '#ef4444' : '#e2e8f0') + ';display:flex;align-items:center;justify-content:center;color:' + (isC||isU ? 'white' : '#94a3b8') + ';font-size:10px;flex-shrink:0;font-weight:900;">' +
+                            (isC ? '✓' : isU ? '✗' : String.fromCharCode(65+j)) + '</span>' + opt + '</div>';
+                    });
+                    h += '<div style="margin-top:12px;background:#eff6ff;border-left:3px solid #3b82f6;border-radius:0 10px 10px 0;padding:12px 16px;font-size:0.82rem;color:#1e40af;line-height:1.65;">' +
+                        '<strong>Vysvětlení:</strong> ' + q.exp + '</div></div></div>';
+                });
+
+                h += '<button onclick="window._ch1Quiz={answers:{},submitted:false};renderChapterTab(\'quiz\')" ' +
+                    'style="width:100%;background:#1e293b;color:white;font-weight:900;padding:16px;border-radius:14px;border:none;cursor:pointer;font-size:1rem;margin-top:8px;transition:background 0.2s;" ' +
+                    'onmouseover="this.style.background=\'#334155\'" onmouseout="this.style.background=\'#1e293b\'">🔄&nbsp; Zkusit znovu</button>';
+
+            } else {
+                qs.forEach(function(q, i) {
+                    h += '<div style="background:white;border:1px solid #e2e8f0;border-radius:16px;padding:22px;margin-bottom:18px;box-shadow:0 1px 4px rgba(0,0,0,0.05);">' +
+                        '<p style="font-weight:800;color:#1e293b;font-size:0.92rem;margin-bottom:16px;display:flex;align-items:center;gap:10px;">' +
+                        '<span style="display:inline-flex;width:26px;height:26px;border-radius:50%;background:#3b82f6;color:white;align-items:center;justify-content:center;font-size:12px;font-weight:900;flex-shrink:0;">' + (i+1) + '</span>' +
+                        q.q + '</p><div>';
+                    q.opts.forEach(function(opt, j) {
+                        var sel = window._ch1Quiz.answers[i] === j;
+                        h += '<button onclick="window._ch1Quiz.answers[' + i + ']=' + j + ';renderChapterTab(\'quiz\')" ' +
+                            'style="width:100%;text-align:left;background:' + (sel ? '#eff6ff' : '#f8fafc') + ';border:' + (sel ? '2px solid #3b82f6' : '1.5px solid #e2e8f0') + ';border-radius:12px;padding:12px 16px;margin-bottom:8px;font-size:0.86rem;font-weight:' + (sel ? '700' : '600') + ';color:' + (sel ? '#1d4ed8' : '#374151') + ';cursor:pointer;display:flex;align-items:center;gap:10px;transition:all 0.15s;" ' +
+                            'onmouseover="if(!(' + sel + ')){this.style.background=\'#f1f5f9\';this.style.borderColor=\'#94a3b8\';}" onmouseout="if(!(' + sel + ')){this.style.background=\'#f8fafc\';this.style.borderColor=\'#e2e8f0\';}">' +
+                            '<span style="width:22px;height:22px;border-radius:50%;background:' + (sel ? '#3b82f6' : '#e2e8f0') + ';display:flex;align-items:center;justify-content:center;color:' + (sel ? 'white' : '#94a3b8') + ';font-size:11px;font-weight:900;flex-shrink:0;">' + String.fromCharCode(65+j) + '</span>' + opt + '</button>';
+                    });
+                    h += '</div></div>';
+                });
+
+                var answered = Object.keys(window._ch1Quiz.answers).length;
+                var allDone = answered >= qs.length;
+                h += '<button onclick="if(' + allDone + '){window._ch1Quiz.submitted=true;renderChapterTab(\'quiz\');}else{alert(\'Prosím odpověz na všech 5 otázek! Zodpovězeno: ' + answered + ' z 5.\');}" ' +
+                    'style="width:100%;background:' + (allDone ? '#10b981' : '#94a3b8') + ';color:white;font-weight:900;padding:16px;border-radius:14px;border:none;cursor:pointer;font-size:1rem;transition:background 0.3s;" ' +
+                    'onmouseover="this.style.background=\'' + (allDone ? '#059669' : '#64748b') + '\'" onmouseout="this.style.background=\'' + (allDone ? '#10b981' : '#94a3b8') + '\'">' +
+                    (allDone ? '✓&nbsp; Vyhodnotit výsledky' : '⏳&nbsp; Zodpověz všechny otázky (' + answered + ' / 5)') + '</button>';
+            }
+
+            h += '</div>';
+            return h;
+        }
+
+        // ------- TAB 5: SLOVNÍK -------
+        function _ch1Glossary() {
+            var terms = [
+                { t: 'Peníze', tag: 'Základ', def: 'Obecně přijímaný prostředek směny, uchovatel hodnoty a měrná jednotka. Moderní peníze jsou „fiat" – jejich hodnota je daná zákonem a důvěrou, nikoliv fyzickou komoditou jako zlatem.' },
+                { t: 'Bartér', tag: 'Historie', def: 'Systém přímé výměny zboží za zboží bez použití peněz. Existoval tisíce let před vznikem peněz. Klíčový problém: nutná „dvojí shoda potřeb" (double coincidence of wants) – obě strany musely chtít přesně to, co druhá nabídla.' },
+                { t: 'Fiat peníze', tag: 'Typy peněz', def: 'Peníze, jejichž hodnota je určena vládním nařízením (zákonem) a důvěrou společnosti, nikoliv vnitřní hodnotou materiálu. Všechny dnešní světové měny (Kč, EUR, USD...) jsou fiat peníze od roku 1971.' },
+                { t: 'Likvidita', tag: 'Klíčový pojem', def: 'Schopnost aktiva být rychle přeměněno na hotovost bez výrazné ztráty hodnoty. Hotovost je nejlikvidnější aktivum. Nemovitost je málo likvidní – prodej trvá měsíce. Akcie jsou středně likvidní.' },
+                { t: 'Měnový agregát (M0, M1, M2, M3)', tag: 'Ekonomika', def: 'Statistické kategorie peněžní zásoby. M0 = bankovky a mince. M1 = M0 + vklady na viděnou (běžné účty). M2 = M1 + termínové vklady. M3 = M2 + podílové listy fondů peněžního trhu.' },
+                { t: 'Zlatý standard', tag: 'Historie', def: 'Měnový systém, kde je hodnota měny pevně navázána na zlato. Existoval přibližně 1870–1971. Velká Británie ho zavedla jako první. Omezoval inflaci, ale byl příliš rigidní v krizích. USA ho definitivně opustily v roce 1971.' },
+                { t: 'Česká národní banka (ČNB)', tag: 'ČR', def: 'Centrální banka ČR, sídlí v Praze. Vydává bankovky a mince, řídí měnovou politiku (cíl: 2% inflace), dohlíží na finanční sektor. Je nezávislá na vládě – rozhodnutí přijímá bankovní rada.' },
+                { t: 'Inflace', tag: 'Viz Kap. 5', def: 'Obecný růst cenové hladiny = znehodnocování kupní síly peněz. 5% inflace = za 100 Kč koupíš o 5 Kč méně než loni. Měřena indexem spotřebitelských cen (CPI). Podrobněji v Kapitole 5.' },
+                { t: 'Kryptoměna', tag: 'Moderní', def: 'Decentralizovaná digitální měna využívající kryptografii a technologii blockchain. Bitcoin (2009) byl první. Narozdíl od fiat peněz ji nevydává žádná centrální banka – je řízena protokolem a síťovým konsenzem.' },
+                { t: 'Monetární politika', tag: 'Ekonomika', def: 'Soubor nástrojů centrální banky pro ovlivňování množství peněz v ekonomice a výše úrokových sazeb. Cílem ČNB je cenová stabilita (2% inflace). Nástroje: úrokové sazby, povinné minimální rezervy, operace na otevřeném trhu.' },
+            ];
+
+            var h = '<div style="max-width:680px;margin:0 auto;">' +
+                '<h3 style="font-size:1.4rem;font-weight:900;color:#1e293b;margin-bottom:4px;">Slovník pojmů</h3>' +
+                '<p style="color:#64748b;margin-bottom:24px;font-size:0.9rem;">10 klíčových pojmů z Kapitoly 1 – klikni na termín pro definici</p>';
+
+            terms.forEach(function(t, i) {
+                h += '<div style="border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;margin-bottom:10px;background:white;box-shadow:0 1px 3px rgba(0,0,0,0.04);">' +
+                    '<button onclick="(function(){var el=document.getElementById(\'gl' + i + '\');var ic=document.getElementById(\'glic' + i + '\');' +
+                    'if(el.style.display===\'none\'){el.style.display=\'block\';ic.style.transform=\'rotate(180deg)\';}' +
+                    'else{el.style.display=\'none\';ic.style.transform=\'rotate(0deg)\';}})()" ' +
+                    'style="width:100%;display:flex;align-items:center;justify-content:space-between;padding:16px 20px;background:none;border:none;cursor:pointer;text-align:left;">' +
+                    '<div style="display:flex;align-items:center;gap:12px;">' +
+                    '<span style="font-weight:900;color:#1e293b;font-size:0.92rem;">' + t.t + '</span>' +
+                    '<span style="font-size:10px;font-weight:700;background:#eff6ff;color:#3b82f6;padding:2px 9px;border-radius:20px;">' + t.tag + '</span>' +
+                    '</div><i id="glic' + i + '" class="fas fa-chevron-down" style="color:#94a3b8;transition:transform 0.25s;font-size:13px;"></i></button>' +
+                    '<div id="gl' + i + '" style="display:none;padding:0 20px 16px;">' +
+                    '<div style="border-top:1px solid #f1f5f9;padding-top:14px;">' +
+                    '<p style="font-size:0.86rem;color:#374151;line-height:1.75;margin:0;">' + t.def + '</p>' +
+                    '</div></div></div>';
+            });
+
+            h += '</div>';
+            return h;
+        }
 
         // Interakce s budovami ve hře
         // --- HLAVNÍ FUNKCE BANKY ---
@@ -2321,7 +2695,55 @@ window.fmt = window.fmt || ((v) => Math.round(v).toLocaleString("cs-CZ"));
 
 
 
-        window.intW = () => { let q=quizBank[Math.floor(Math.random()*quizBank.length)]; showModal("Škola/Práce", q.q, null, null, q.opts.map((o,i)=>`<button onclick="if(${i===q.ans}){state.correctAnswers++;logTx('Výplata',1500);advanceTime();showModal('Správně','+1500 Kč.','Ok');}else{advanceTime();showModal('Špatně','Zkus to znovu.','Ok');}" class="w-full text-left p-3 border rounded mb-2 hover:bg-slate-50 font-bold">${o}</button>`).join('')); }
+        // Globální stav školního kvízu
+        window._schoolQuiz = null;
+
+        // Voláno tlačítky odpovědí - odděleně od HTML atributu, bezpečně
+        window.answerQuestion = function(idx) {
+            var q = window._schoolQuiz;
+            if (!q) return;
+            window._schoolQuiz = null;
+
+            if (idx === q.ans) {
+                state.correctAnswers++;
+                logTx('Výplata za správnou odpověď', 1500);
+                advanceTime();
+                showModal(
+                    'Správně! ✓',
+                    'Výborně! Dostáváš odměnu <strong>+1 500 Kč</strong>. Tvoje znalosti se zhodnocují!',
+                    'Pokračovat'
+                );
+            } else {
+                advanceTime();
+                showModal(
+                    'Špatně ✗',
+                    'Správná odpověď byla: <strong>' + q.opts[q.ans] + '</strong>.<br>Příště to určitě zvládneš!',
+                    'Zkusit znovu'
+                );
+            }
+        };
+
+        window.intW = () => {
+            var q = quizBank[Math.floor(Math.random() * quizBank.length)];
+            window._schoolQuiz = q;
+
+            var letters = ['A', 'B', 'C', 'D'];
+            var optsHtml = q.opts.map(function(o, i) {
+                return '<button onclick="answerQuestion(' + i + ')" '
+                    + 'style="display:block;width:100%;text-align:left;padding:14px 20px;'
+                    + 'border:1.5px solid #e2e8f0;border-radius:12px;margin-bottom:10px;'
+                    + 'cursor:pointer;font-weight:600;font-size:0.9rem;background:white;'
+                    + 'color:#374151;font-family:sans-serif;transition:all 0.15s;" '
+                    + 'onmouseover="this.style.background=\'#eff6ff\';this.style.borderColor=\'#3b82f6\';this.style.color=\'#1d4ed8\';" '
+                    + 'onmouseout="this.style.background=\'white\';this.style.borderColor=\'#e2e8f0\';this.style.color=\'#374151\';">'
+                    + '<span style="display:inline-flex;width:24px;height:24px;border-radius:50%;background:#f1f5f9;'
+                    + 'align-items:center;justify-content:center;font-size:11px;font-weight:800;margin-right:12px;'
+                    + 'color:#64748b;flex-shrink:0;">' + letters[i] + '</span>'
+                    + o + '</button>';
+            }).join('');
+
+            showModal('Škola / Zaměstnání', q.q, null, null, optsHtml);
+        };
 
             const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
